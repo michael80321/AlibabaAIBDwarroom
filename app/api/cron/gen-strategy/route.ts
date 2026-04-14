@@ -48,7 +48,7 @@ export async function POST(req: NextRequest) {
     });
 
     if (!result) {
-      return NextResponse.json({ error: 'Strategy generation failed' }, { status: 500 });
+      return NextResponse.json({ error: 'Strategy generation failed - Claude API returned null. Check ANTHROPIC_API_KEY and model name.' }, { status: 500 });
     }
 
     const today = new Date();
@@ -75,6 +75,7 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ success: true, strategy });
   } catch (error) {
     console.error('[cron/gen-strategy]', error);
-    return NextResponse.json({ error: 'Internal error' }, { status: 500 });
+    const msg = error instanceof Error ? error.message : String(error);
+    return NextResponse.json({ error: 'Internal error', detail: msg }, { status: 500 });
   }
 }
