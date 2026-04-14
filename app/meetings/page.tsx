@@ -1,3 +1,4 @@
+export const dynamic = 'force-dynamic';
 import { prisma } from '@/lib/prisma';
 import MeetingNoteForm from '@/components/MeetingNoteForm';
 import { format } from 'date-fns';

@@ -76,7 +76,7 @@ export async function fetchAllVendorNews(lightweightMode = false): Promise<void>
           url: item.link,
           credibility: source.credibility,
           pubDate: item.pubDate || new Date().toISOString(),
-          content: (item as Record<string, unknown>).contentEncoded as string || item.content || item.contentSnippet || '',
+          content: (item as unknown as Record<string, unknown>).contentEncoded as string || item.content || item.contentSnippet || '',
         });
       }
     } catch (error) {
