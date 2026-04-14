@@ -1,0 +1,173 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model Customer {
+  id               String   @id @default(cuid())
+  company_name     String
+  industry         String?
+  region           String?
+  company_size     String?
+  website          String?
+  current_cloud    String?
+  priority_label   String   @default("Monitor")
+  priority_score   Int      @default(0)
+  entry_points     String[]
+  estimated_arr    Int?
+  why_now          String?
+  opening_pitch    String?
+  pain_points      String[]
+  tech_stack       String[]
+  last_contacted   DateTime?
+  created_at       DateTime @default(now())
+  updated_at       DateTime @updatedAt
+
+  contacts         Contact[]
+  pipeline_stages  PipelineStage[]
+  meeting_notes    MeetingNote[]
+  score_breakdown  CustomerScore?
+
+  @@map("customers")
+}
+
+model Contact {
+  id           String   @id @default(cuid())
+  customer_id  String
+  name         String
+  title        String?
+  email        String?
+  linkedin_url String?
+  influence    String   @default("unknown")
+  notes        String?
+  customer     Customer @relation(fields: [customer_id], references: [id])
+
+  @@map("contacts")
+}
+
+model CustomerScore {
+  id                    String   @id @default(cuid())
+  customer_id           String   @unique
+  pain_signal           Int      @default(0)
+  budget_signal         Int      @default(0)
+  timeline_signal       Int      @default(0)
+  tech_fit              Int      @default(0)
+  competitor_issue      Int      @default(0)
+  china_expansion       Int      @default(0)
+  ai_gpu_demand         Int      @default(0)
+  decision_maker_access Int      @default(0)
+  relationship_warmth   Int      @default(0)
+  company_size_fit      Int      @default(0)
+  total_score           Int      @default(0)
+  ai_reason             String?
+  calculated_at         DateTime @default(now())
+  customer              Customer @relation(fields: [customer_id], references: [id])
+
+  @@map("customer_scores")
+}
+
+model PipelineStage {
+  id              String    @id @default(cuid())
+  customer_id     String
+  stage           String
+  entered_at      DateTime  @default(now())
+  expected_close  DateTime?
+  deal_value      Int?
+  blockers        String?
+  risk_level      String    @default("medium")
+  next_action     String?
+  next_action_due DateTime?
+  notes           String?
+  customer        Customer  @relation(fields: [customer_id], references: [id])
+
+  @@map("pipeline_stages")
+}
+
+model MeetingNote {
+  id              String   @id @default(cuid())
+  customer_id     String
+  meeting_date    DateTime
+  raw_notes       String
+  summary         String?
+  decision_makers String?
+  pain_points     String?
+  objections      String?
+  budget_timeline String?
+  next_steps      String?
+  updated_pitch   String?
+  created_at      DateTime @default(now())
+  customer        Customer @relation(fields: [customer_id], references: [id])
+
+  @@map("meeting_notes")
+}
+
+model CloudVendorNews {
+  id           String   @id @default(cuid())
+  vendor       String
+  title        String
+  summary      String?
+  url          String
+  source       String
+  credibility  Int      @default(2)
+  category     String
+  published_at DateTime
+  created_at   DateTime @default(now())
+
+  @@map("cloud_vendor_news")
+}
+
+model ServiceStatus {
+  id              String   @id @default(cuid())
+  vendor          String
+  status          String
+  previous_status String?
+  incident        String?
+  affected_services String[]
+  checked_at      DateTime @default(now())
+
+  @@map("service_status")
+}
+
+model StatusIncident {
+  id                 String    @id @default(cuid())
+  vendor             String
+  severity           String
+  title              String
+  description        String?
+  started_at         DateTime  @default(now())
+  resolved_at        DateTime?
+  telegram_sent      Boolean   @default(false)
+  affected_customers String[]
+
+  @@map("status_incidents")
+}
+
+model Partner {
+  id               String   @id @default(cuid())
+  name             String
+  type             String
+  services         String[]
+  regions          String[]
+  cloud_alliances  String[]
+  cooperation_type String   @default("monitor")
+  contact_info     String?
+  notes            String?
+
+  @@map("partners")
+}
+
+model DailyStrategy {
+  id                String   @id @default(cuid())
+  date              DateTime @unique
+  top3_actions      Json
+  weekly_focus      String?
+  monthly_direction String?
+  abandon_list      Json?
+  generated_at      DateTime @default(now())
+
+  @@map("daily_strategies")
+}

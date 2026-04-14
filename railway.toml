@@ -1,0 +1,40 @@
+[build]
+builder = "nixpacks"
+
+[deploy]
+startCommand = "pnpm prisma migrate deploy && pnpm start"
+healthcheckPath = "/api/health"
+healthcheckTimeout = 60
+
+[[services]]
+name = "warroom-app"
+
+[[crons]]
+name    = "check-status"
+schedule = "*/10 * * * *"
+command = "curl -s -X POST $APP_URL/api/cron/check-status -H 'x-cron-secret: $CRON_SECRET'"
+
+[[crons]]
+name    = "fetch-news"
+schedule = "0 22 * * *"
+command = "curl -s -X POST $APP_URL/api/cron/fetch-news -H 'x-cron-secret: $CRON_SECRET'"
+
+[[crons]]
+name    = "gen-strategy"
+schedule = "30 22 * * *"
+command = "curl -s -X POST $APP_URL/api/cron/gen-strategy -H 'x-cron-secret: $CRON_SECRET'"
+
+[[crons]]
+name    = "news-midday"
+schedule = "0 4 * * *"
+command = "curl -s -X POST $APP_URL/api/cron/news-midday -H 'x-cron-secret: $CRON_SECRET'"
+
+[[crons]]
+name    = "score-customers"
+schedule = "0 0 * * *"
+command = "curl -s -X POST $APP_URL/api/cron/score-customers -H 'x-cron-secret: $CRON_SECRET'"
+
+[[crons]]
+name    = "weekly-strategy"
+schedule = "0 23 * * 0"
+command = "curl -s -X POST $APP_URL/api/cron/gen-strategy?weekly=true -H 'x-cron-secret: $CRON_SECRET'"
