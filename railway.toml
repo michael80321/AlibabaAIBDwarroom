@@ -41,5 +41,5 @@ command = "curl -s -X POST $APP_URL/api/cron/gen-strategy?weekly=true -H 'x-cron
 
 [[crons]]
 name    = "release-prospects"
-schedule = "0 21 * * *"
+schedule = "0 23 * * *"
 command = "curl -s -X POST $APP_URL/api/cron/release-prospects -H 'x-cron-secret: $CRON_SECRET'"

@@ -55,29 +55,46 @@ open http://localhost:3000
 
 ## Railway 部署
 
+### 步驟
+
 ```bash
 # 1. 登入 Railway
 railway login
 
-# 2. 初始化專案
+# 2. 初始化專案（或 link 現有專案）
 railway init
 
 # 3. 新增 PostgreSQL 資料庫
 railway add --database postgresql
 
-# 4. 部署
+# 4. 設定環境變數（必填）
+railway variables set ANTHROPIC_API_KEY=sk-ant-...
+railway variables set CRON_SECRET=$(openssl rand -hex 32)
+
+# 5. 部署（第一次）
 railway up
 
-# 5. 設定環境變數
-railway variables set ANTHROPIC_API_KEY=sk-ant-...
-railway variables set TELEGRAM_BOT_TOKEN=...
-railway variables set TELEGRAM_CHAT_ID=...
-railway variables set CRON_SECRET=your-secret
+# 6. 取得部署 URL 後設定（從 Railway Dashboard 複製）
+railway variables set APP_URL=https://your-app.railway.app
 railway variables set WAR_ROOM_URL=https://your-app.railway.app
 
-# 6. 執行 Seed（第一次部署後）
+# 7. 選填：Telegram 通知
+railway variables set TELEGRAM_BOT_TOKEN=...
+railway variables set TELEGRAM_CHAT_ID=...
+
+# 8. 執行 Seed（第一次部署完成後）
 railway run pnpm prisma db seed
+
+# 9. 重新部署（讓 Seed 後的 DB 生效）
+railway up
 ```
+
+### 重要注意事項
+
+- **APP_URL** 必須設定才能讓 Cron Job 正常運作（Railway 用這個變數打 API）
+- **Seed 只需執行一次**，之後 Cron Job 會自動補充每日推薦名單
+- Railway 免費方案的 Cron 功能需要升級到 Hobby 方案
+- PostgreSQL 資料庫連線字串 (`DATABASE_URL`) 由 Railway 自動注入，不需手動設定
 
 ## 頁面功能
 
@@ -95,9 +112,10 @@ railway run pnpm prisma db seed
 
 | 名稱 | 時間 | 說明 |
 |------|------|------|
-| check-status | 每 10 分鐘 | 檢查各雲廠商服務狀態 |
-| fetch-news | 每天 06:00 (台北) | 抓取 RSS 新聞並 AI 摘要 |
-| gen-strategy | 每天 06:30 (台北) | AI 生成今日策略並發 Telegram |
-| news-midday | 每天 12:00 (台北) | 輕量新聞掃描 |
-| score-customers | 每天 08:00 (台北) | 重算所有客戶評分 |
+| check-status | 每 10 分鐘 | 檢查各雲廠商服務狀態（AWS/Azure/GCP/Cloudflare/Tencent/Huawei 等）|
+| fetch-news | 每天 06:00 (台北) | 從官方 RSS 抓取競品新聞並 AI 摘要 + BD 角度分析 |
+| gen-strategy | 每天 06:30 (台北) | AI 生成今日 Top3 作戰指令並推送 Telegram |
+| news-midday | 每天 12:00 (台北) | 中午輕量新聞掃描（無 AI 摘要，省 API 費用）|
+| score-customers | 每天 08:00 (台北) | 重算所有客戶優先級評分 |
 | weekly-strategy | 每週一 07:00 (台北) | 週策略生成 |
+| release-prospects | 每天 07:00 (台北) | 從備用池釋出 25 筆新潛在客戶推薦 |
