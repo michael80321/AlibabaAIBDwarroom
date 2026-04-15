@@ -1,4 +1,8 @@
 import { PrismaClient } from '@prisma/client';
+import { prospectData } from './prospect-data-1';
+import { prospectData2 } from './prospect-data-2';
+import { prospectData3 } from './prospect-data-3';
+import { partnerProspectData } from './partner-prospect-data';
 
 const prisma = new PrismaClient();
 
@@ -16,6 +20,8 @@ async function main() {
   await prisma.serviceStatus.deleteMany();
   await prisma.statusIncident.deleteMany();
   await prisma.dailyStrategy.deleteMany();
+  await prisma.prospectRecommendation.deleteMany();
+  await prisma.partnerProspect.deleteMany();
 
   // --- Customers ---
   const trendmicro = await prisma.customer.create({
@@ -544,8 +550,20 @@ async function main() {
     },
   });
 
+  // --- Prospect Recommendations ---
+  const allProspects = [...prospectData, ...prospectData2, ...prospectData3];
+  for (const p of allProspects) {
+    await prisma.prospectRecommendation.create({ data: p });
+  }
+
+  // --- Partner Prospects ---
+  for (const pp of partnerProspectData) {
+    await prisma.partnerProspect.create({ data: pp });
+  }
+
   console.log('Seed completed successfully!');
   console.log(`Created ${6} customers, ${4} partners, ${8} news items`);
+  console.log(`Created ${allProspects.length} prospect recommendations, ${partnerProspectData.length} partner prospects`);
 }
 
 main()

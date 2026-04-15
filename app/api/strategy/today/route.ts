@@ -22,7 +22,7 @@ export async function GET() {
     const stuckPipeline = await prisma.pipelineStage.findMany({
       where: {
         entered_at: { lte: new Date(Date.now() - 14 * 24 * 60 * 60 * 1000) },
-        stage: { notIn: ['close', 'lost'] },
+        stage: { notIn: ['close', 'lost', 'hold'] },
       },
       include: { customer: true },
     });

@@ -30,6 +30,7 @@ const STAGES = [
   { key: 'proposal', label: 'Proposal', color: 'border-yellow-600' },
   { key: 'negotiation', label: 'Negotiation', color: 'border-orange-600' },
   { key: 'close', label: 'Close', color: 'border-green-600' },
+  { key: 'hold', label: '⏸ 暫緩跟進', color: 'border-yellow-800' },
 ];
 
 const RISK_COLORS: Record<string, string> = {

@@ -7,6 +7,7 @@ import { useState, useEffect } from 'react';
 const navItems = [
   { href: '/', label: '今日作戰指令', icon: '⚔️' },
   { href: '/prospects', label: '潛在客戶', icon: '🎯' },
+  { href: '/partners', label: '合作夥伴', icon: '🤝' },
   { href: '/pipeline', label: 'Pipeline 看板', icon: '📊' },
   { href: '/intelligence', label: '市場情報', icon: '🌐' },
   { href: '/strategy', label: '策略中心', icon: '🧠' },

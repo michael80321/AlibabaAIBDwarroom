@@ -8,7 +8,7 @@ export async function GET() {
   const stuck = await prisma.pipelineStage.findMany({
     where: {
       entered_at: { lte: fourteenDaysAgo },
-      stage: { notIn: ['close', 'lost'] },
+      stage: { notIn: ['close', 'lost', 'hold'] },
     },
     include: {
       customer: {
