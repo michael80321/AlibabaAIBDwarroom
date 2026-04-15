@@ -160,6 +160,45 @@ model Partner {
   @@map("partners")
 }
 
+model ProspectRecommendation {
+  id               String   @id @default(cuid())
+  company_name     String
+  category         String   // enterprise, igaming, adult, cloud_ai, ecommerce, fintech
+  region           String   // TW, SEA, HK, CN, APAC, Global
+  description      String?
+  why_alibaba      String?
+  estimated_arr    Int?
+  website          String?
+  contact_hint     String?
+  headcount        String?
+  tech_stack       String[]
+  status           String   @default("new") // new, interested, pipeline, hold, cant_pursue
+  status_reason    String?
+  recommended_date DateTime @default(now())
+  created_at       DateTime @default(now())
+  updated_at       DateTime @updatedAt
+
+  @@map("prospect_recommendations")
+}
+
+model PartnerProspect {
+  id               String   @id @default(cuid())
+  name             String
+  type             String   // SI, ISV, reseller, technology, agency
+  region           String
+  description      String?
+  services         String[]
+  why_partner      String?
+  cooperation_type String?
+  status           String   @default("new") // new, contacted, active, hold, cant_pursue
+  status_reason    String?
+  recommended_date DateTime @default(now())
+  created_at       DateTime @default(now())
+  updated_at       DateTime @updatedAt
+
+  @@map("partner_prospects")
+}
+
 model DailyStrategy {
   id                String   @id @default(cuid())
   date              DateTime @unique
