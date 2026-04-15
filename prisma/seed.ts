@@ -2,7 +2,11 @@ import { PrismaClient } from '@prisma/client';
 import { prospectData } from './prospect-data-1';
 import { prospectData2 } from './prospect-data-2';
 import { prospectData3 } from './prospect-data-3';
+import { prospectData4 } from './prospect-data-4';
+import { prospectData5 } from './prospect-data-5';
+import { prospectData6 } from './prospect-data-6';
 import { partnerProspectData } from './partner-prospect-data';
+import { partnerProspectData2 } from './partner-prospect-data-2';
 
 const prisma = new PrismaClient();
 
@@ -551,19 +555,53 @@ async function main() {
   });
 
   // --- Prospect Recommendations ---
-  const allProspects = [...prospectData, ...prospectData2, ...prospectData3];
+  // Spread recommended_date across the last 7 days to simulate daily pushes
+  // Each "batch" represents a day's worth of new recommendations
+  const daysAgo = (d: number) => {
+    const dt = new Date();
+    dt.setDate(dt.getDate() - d);
+    dt.setHours(7, 0, 0, 0); // 07:00 daily push
+    return dt;
+  };
+
+  // Day 0 (today): iGaming batch 1 (8 companies)
+  const batch0 = prospectData4.slice(0, 8).map(p => ({ ...p, recommended_date: daysAgo(0) }));
+  // Day 1 (yesterday): Cloud/AI batch 1 (8 companies)
+  const batch1 = prospectData6.slice(0, 8).map(p => ({ ...p, recommended_date: daysAgo(1) }));
+  // Day 2: Adult batch 1 (7 companies)
+  const batch2 = prospectData5.slice(0, 7).map(p => ({ ...p, recommended_date: daysAgo(2) }));
+  // Day 3: iGaming batch 2 (8 companies)
+  const batch3 = prospectData4.slice(8, 16).map(p => ({ ...p, recommended_date: daysAgo(3) }));
+  // Day 4: Cloud/AI batch 2 (7 companies)
+  const batch4 = prospectData6.slice(8, 15).map(p => ({ ...p, recommended_date: daysAgo(4) }));
+  // Day 5: Adult batch 2 (8 companies) + iGaming batch 3
+  const batch5 = [
+    ...prospectData5.slice(7).map(p => ({ ...p, recommended_date: daysAgo(5) })),
+    ...prospectData4.slice(16).map(p => ({ ...p, recommended_date: daysAgo(5) })),
+  ];
+  // Day 6: Cloud/AI batch 3 (remaining)
+  const batch6 = prospectData6.slice(15).map(p => ({ ...p, recommended_date: daysAgo(6) }));
+  // Older: original data (enterprise/fintech/ecommerce)
+  const batchOld = [
+    ...prospectData.map(p => ({ ...p, recommended_date: daysAgo(7) })),
+    ...prospectData2.map(p => ({ ...p, recommended_date: daysAgo(8) })),
+    ...prospectData3.map(p => ({ ...p, recommended_date: daysAgo(9) })),
+  ];
+
+  const allProspects = [...batch0, ...batch1, ...batch2, ...batch3, ...batch4, ...batch5, ...batch6, ...batchOld];
   for (const p of allProspects) {
     await prisma.prospectRecommendation.create({ data: p });
   }
 
   // --- Partner Prospects ---
-  for (const pp of partnerProspectData) {
+  const allPartnerProspects = [...partnerProspectData, ...partnerProspectData2];
+  for (const pp of allPartnerProspects) {
     await prisma.partnerProspect.create({ data: pp });
   }
 
   console.log('Seed completed successfully!');
   console.log(`Created ${6} customers, ${4} partners, ${8} news items`);
-  console.log(`Created ${allProspects.length} prospect recommendations, ${partnerProspectData.length} partner prospects`);
+  console.log(`Created ${allProspects.length} prospect recommendations, ${allPartnerProspects.length} partner prospects`);
 }
 
 main()

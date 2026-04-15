@@ -75,11 +75,90 @@ const STATUSES = [
   { key: 'cant_pursue', label: '無法跟進', color: 'text-gray-500' },
 ];
 
+function isToday(date: Date | string): boolean {
+  const d = new Date(date);
+  const now = new Date();
+  return (
+    d.getFullYear() === now.getFullYear() &&
+    d.getMonth() === now.getMonth() &&
+    d.getDate() === now.getDate()
+  );
+}
+
+// Modal for status reason input
+function StatusReasonModal({
+  companyName,
+  targetStatus,
+  onConfirm,
+  onCancel,
+}: {
+  companyName: string;
+  targetStatus: string;
+  onConfirm: (reason: string) => void;
+  onCancel: () => void;
+}) {
+  const [reason, setReason] = useState('');
+
+  const statusLabel: Record<string, string> = {
+    hold: '暫緩跟進',
+    cant_pursue: '無法跟進',
+    interested: '標記有興趣',
+    pipeline: '加入 Pipeline',
+  };
+
+  const reasonPlaceholder: Record<string, string> = {
+    hold: '例如：預算不足、決策者換人、時機未到...',
+    cant_pursue: '例如：已在 AWS 長約綁定、競品已深度整合...',
+    interested: '例如：對方主動詢問、上週活動接觸...',
+    pipeline: '例如：已安排 POC、進入評估階段...',
+  };
+
+  return (
+    <div className="fixed inset-0 bg-black/70 flex items-center justify-center z-50" onClick={onCancel}>
+      <div
+        className="bg-gray-900 border border-gray-700 rounded-xl p-5 w-full max-w-md mx-4"
+        onClick={(e) => e.stopPropagation()}
+      >
+        <h3 className="text-white font-bold mb-1">
+          {statusLabel[targetStatus] || targetStatus}
+        </h3>
+        <p className="text-gray-400 text-sm mb-3">
+          <span className="text-white">{companyName}</span>
+        </p>
+        <textarea
+          autoFocus
+          value={reason}
+          onChange={(e) => setReason(e.target.value)}
+          placeholder={reasonPlaceholder[targetStatus] || '備註原因（選填）'}
+          className="w-full bg-gray-800 border border-gray-700 rounded-lg px-3 py-2 text-sm text-white placeholder-gray-600 resize-none focus:outline-none focus:border-gray-500"
+          rows={3}
+        />
+        <div className="flex gap-2 mt-3">
+          <button
+            onClick={() => onConfirm(reason)}
+            className="flex-1 py-2 rounded-lg bg-white text-gray-900 text-sm font-medium hover:bg-gray-200 transition-colors"
+          >
+            確認
+          </button>
+          <button
+            onClick={onCancel}
+            className="flex-1 py-2 rounded-lg bg-gray-800 text-gray-400 text-sm hover:text-white transition-colors"
+          >
+            取消
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 export default function ProspectsClient({
   prospects: initialProspects,
+  todayCount,
   customers,
 }: {
   prospects: Prospect[];
+  todayCount: number;
   customers: Customer[];
 }) {
   const router = useRouter();
@@ -88,16 +167,31 @@ export default function ProspectsClient({
   const [category, setCategory] = useState('all');
   const [region, setRegion] = useState('all');
   const [status, setStatus] = useState('all');
+  const [dateFilter, setDateFilter] = useState<'today' | 'week' | 'all'>('today');
   const [updating, setUpdating] = useState<string | null>(null);
 
+  // Modal state
+  const [modal, setModal] = useState<{
+    prospectId: string;
+    companyName: string;
+    targetStatus: string;
+  } | null>(null);
+
   const filtered = useMemo(() => {
+    const now = new Date();
     return prospects.filter((p) => {
       if (category !== 'all' && p.category !== category) return false;
       if (region !== 'all' && p.region !== region) return false;
       if (status !== 'all' && p.status !== status) return false;
+      if (dateFilter === 'today') {
+        if (!isToday(p.recommended_date)) return false;
+      } else if (dateFilter === 'week') {
+        const weekAgo = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000);
+        if (new Date(p.recommended_date) < weekAgo) return false;
+      }
       return true;
     });
-  }, [prospects, category, region, status]);
+  }, [prospects, category, region, status, dateFilter]);
 
   const stats = useMemo(() => {
     return {
@@ -109,19 +203,32 @@ export default function ProspectsClient({
     };
   }, [prospects]);
 
-  async function updateStatus(id: string, newStatus: string) {
-    setUpdating(id);
+  function requestStatusUpdate(id: string, companyName: string, newStatus: string) {
+    // For interested/pipeline also show modal (optional note)
+    // For hold/cant_pursue always show modal for reason
+    setModal({ prospectId: id, companyName, targetStatus: newStatus });
+  }
+
+  async function confirmStatusUpdate(reason: string) {
+    if (!modal) return;
+    const { prospectId, targetStatus } = modal;
+    setModal(null);
+    setUpdating(prospectId);
     try {
-      const res = await fetch(`/api/prospects/${id}/status`, {
+      const res = await fetch(`/api/prospects/${prospectId}/status`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ status: newStatus }),
+        body: JSON.stringify({ status: targetStatus, reason }),
       });
       if (res.ok) {
         setProspects((prev) =>
-          prev.map((p) => (p.id === id ? { ...p, status: newStatus } : p))
+          prev.map((p) =>
+            p.id === prospectId
+              ? { ...p, status: targetStatus, status_reason: reason || p.status_reason }
+              : p
+          )
         );
-        if (newStatus === 'pipeline') {
+        if (targetStatus === 'pipeline') {
           router.refresh();
         }
       }
@@ -132,6 +239,15 @@ export default function ProspectsClient({
 
   return (
     <div>
+      {modal && (
+        <StatusReasonModal
+          companyName={modal.companyName}
+          targetStatus={modal.targetStatus}
+          onConfirm={confirmStatusUpdate}
+          onCancel={() => setModal(null)}
+        />
+      )}
+
       {/* Header */}
       <div className="mb-6">
         <h1 className="text-2xl font-bold text-white mb-1">🎯 潛在客戶</h1>
@@ -149,6 +265,11 @@ export default function ProspectsClient({
           }`}
         >
           📋 每日推薦名單 ({prospects.length})
+          {todayCount > 0 && (
+            <span className="ml-2 px-1.5 py-0.5 rounded-full bg-blue-600 text-white text-xs">
+              今日 +{todayCount}
+            </span>
+          )}
         </button>
         <button
           onClick={() => setView('tracked')}
@@ -186,6 +307,24 @@ export default function ProspectsClient({
               <div className="text-xs text-gray-400">無法跟進</div>
               <div className="text-xl font-bold text-white">{stats.cant_pursue}</div>
             </div>
+          </div>
+
+          {/* Date Filter */}
+          <div className="flex gap-2 mb-3">
+            <span className="text-xs text-gray-500 self-center">推薦時間:</span>
+            {(['today', 'week', 'all'] as const).map((d) => (
+              <button
+                key={d}
+                onClick={() => setDateFilter(d)}
+                className={`px-3 py-1 rounded-full text-xs font-medium transition-colors ${
+                  dateFilter === d
+                    ? 'bg-blue-600 text-white'
+                    : 'bg-gray-800 text-gray-400 hover:text-white'
+                }`}
+              >
+                {d === 'today' ? `今日 (${todayCount})` : d === 'week' ? '近 7 天' : '全部'}
+              </button>
+            ))}
           </div>
 
           {/* Category Tabs */}
@@ -249,12 +388,14 @@ export default function ProspectsClient({
                 key={p.id}
                 prospect={p}
                 updating={updating === p.id}
-                onUpdate={(newStatus) => updateStatus(p.id, newStatus)}
+                onUpdate={(newStatus) => requestStatusUpdate(p.id, p.company_name, newStatus)}
               />
             ))}
             {filtered.length === 0 && (
               <div className="col-span-full text-center py-12 text-gray-600">
-                沒有符合條件的推薦
+                {dateFilter === 'today'
+                  ? '今日尚無新推薦，請切換到「近 7 天」或「全部」查看'
+                  : '沒有符合條件的推薦'}
               </div>
             )}
           </div>
@@ -294,11 +435,20 @@ function ProspectCard({
   };
   const statusBorder = statusColorMap[prospect.status] || 'border-gray-800';
 
+  const todayBadge = isToday(prospect.recommended_date);
+
   return (
     <div className={`bg-gray-900 border ${statusBorder} rounded-xl p-4 transition-all ${updating ? 'opacity-50' : ''}`}>
       <div className="flex items-start justify-between mb-2">
         <div className="flex-1 min-w-0">
-          <h3 className="text-white font-bold text-sm truncate">{prospect.company_name}</h3>
+          <div className="flex items-center gap-1.5 mb-0.5">
+            <h3 className="text-white font-bold text-sm truncate">{prospect.company_name}</h3>
+            {todayBadge && (
+              <span className="flex-shrink-0 text-[10px] px-1 py-0.5 rounded bg-blue-600/80 text-blue-100">
+                今日新
+              </span>
+            )}
+          </div>
           {prospect.website && (
             <a
               href={prospect.website}
@@ -348,7 +498,9 @@ function ProspectCard({
       </div>
 
       {prospect.status_reason && (
-        <div className="text-xs text-yellow-500 mb-2 italic">備註: {prospect.status_reason}</div>
+        <div className="text-xs text-yellow-500 mb-2 italic truncate" title={prospect.status_reason}>
+          備註: {prospect.status_reason}
+        </div>
       )}
 
       {/* Action Buttons */}

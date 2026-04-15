@@ -38,3 +38,8 @@ command = "curl -s -X POST $APP_URL/api/cron/score-customers -H 'x-cron-secret: 
 name    = "weekly-strategy"
 schedule = "0 23 * * 0"
 command = "curl -s -X POST $APP_URL/api/cron/gen-strategy?weekly=true -H 'x-cron-secret: $CRON_SECRET'"
+
+[[crons]]
+name    = "release-prospects"
+schedule = "0 21 * * *"
+command = "curl -s -X POST $APP_URL/api/cron/release-prospects -H 'x-cron-secret: $CRON_SECRET'"

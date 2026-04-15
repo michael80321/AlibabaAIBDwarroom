@@ -20,7 +20,8 @@ export async function POST(
 ) {
   try {
     const body = await req.json();
-    const { status, status_reason } = body as { status: string; status_reason?: string };
+    const { status, status_reason, reason } = body as { status: string; status_reason?: string; reason?: string };
+    const finalReason = reason || status_reason || null;
 
     const prospect = await prisma.prospectRecommendation.findUnique({
       where: { id: params.id },
@@ -67,7 +68,7 @@ export async function POST(
 
     const updated = await prisma.prospectRecommendation.update({
       where: { id: params.id },
-      data: { status, status_reason: status_reason || null },
+      data: { status, status_reason: finalReason },
     });
 
     return NextResponse.json(updated);
