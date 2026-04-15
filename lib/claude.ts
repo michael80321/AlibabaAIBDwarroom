@@ -158,7 +158,7 @@ ${contextStr}
     return JSON.parse(jsonText) as DailyStrategyResult;
   } catch (error) {
     console.error('generateDailyStrategy error:', error);
-    throw error;
+    return null;
   }
 }
 
