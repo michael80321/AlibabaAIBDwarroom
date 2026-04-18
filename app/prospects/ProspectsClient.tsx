@@ -249,9 +249,17 @@ export default function ProspectsClient({
       )}
 
       {/* Header */}
-      <div className="mb-6">
-        <h1 className="text-2xl font-bold text-white mb-1">🎯 潛在客戶</h1>
-        <p className="text-gray-500 text-sm">每日 AI 推薦新客戶名單與追蹤中客戶</p>
+      <div className="flex items-start justify-between mb-6">
+        <div>
+          <h1 className="text-2xl font-bold text-white mb-1">🎯 潛在客戶</h1>
+          <p className="text-gray-500 text-sm">每日 AI 推薦新客戶名單與追蹤中客戶</p>
+        </div>
+        <Link
+          href="/customers/new"
+          className="px-4 py-2 rounded-lg bg-blue-600 hover:bg-blue-500 text-white text-sm font-medium transition-colors"
+        >
+          + 手動新增客戶
+        </Link>
       </div>
 
       {/* View Toggle */}

@@ -1,10 +1,48 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useEffect, useState, KeyboardEvent } from 'react';
 import { format } from 'date-fns';
 import { zhTW } from 'date-fns/locale';
 import PriorityBadge from '@/components/PriorityBadge';
 import Link from 'next/link';
+
+const ENTRY_POINT_OPTIONS = ['AI', 'GPU', 'CDN', 'Global', 'China', 'China Access', 'Cost', 'SEA'];
+const PRIORITY_OPTIONS = ['Hot', 'Warm', 'Cold', 'Monitor'];
+const REGION_OPTIONS = ['TW', 'SEA', 'HK', 'CN', 'APAC', 'Global', 'JP', 'KR', 'SG', 'MY', 'TH', 'ID', 'PH', 'VN'];
+const SIZE_OPTIONS = ['1-50', '51-200', '201-500', '501-2000', '2000+'];
+const CLOUD_OPTIONS = ['AWS', 'Azure', 'GCP', 'Alibaba Cloud', 'Tencent Cloud', 'Huawei Cloud', 'Multi-cloud', 'Oracle', 'Other'];
+const INDUSTRY_OPTIONS = [
+  'iGaming', 'Fintech', 'E-commerce', 'Media & Entertainment', 'Gaming', 'Adult Content',
+  'AI / ML', 'SaaS', 'Crypto / Web3', 'Healthcare', 'Logistics', 'Retail', 'Travel',
+  'Education', 'Telecom', 'Manufacturing', 'Other',
+];
+
+function TagInput({
+  tags, onChange, placeholder, colorClass = 'bg-gray-700 text-gray-300',
+}: { tags: string[]; onChange: (t: string[]) => void; placeholder: string; colorClass?: string }) {
+  const [input, setInput] = useState('');
+  const add = (v: string) => {
+    const t = v.trim();
+    if (t && !tags.includes(t)) onChange([...tags, t]);
+    setInput('');
+  };
+  const onKey = (e: KeyboardEvent<HTMLInputElement>) => {
+    if (e.key === 'Enter' || e.key === ',') { e.preventDefault(); add(input); }
+    else if (e.key === 'Backspace' && !input && tags.length) onChange(tags.slice(0, -1));
+  };
+  return (
+    <div className="flex flex-wrap gap-1.5 p-2 bg-gray-800 border border-gray-700 rounded-lg min-h-[38px]">
+      {tags.map((t) => (
+        <span key={t} className={`inline-flex items-center gap-1 text-xs px-2 py-0.5 rounded ${colorClass}`}>
+          {t}
+          <button type="button" onClick={() => onChange(tags.filter((x) => x !== t))} className="opacity-60 hover:opacity-100">×</button>
+        </span>
+      ))}
+      <input value={input} onChange={(e) => setInput(e.target.value)} onKeyDown={onKey} onBlur={() => add(input)}
+        placeholder={tags.length === 0 ? placeholder : ''} className="flex-1 min-w-[100px] bg-transparent text-sm text-white outline-none placeholder-gray-600" />
+    </div>
+  );
+}
 
 const STAGE_ORDER = ['lead', 'meeting', 'poc', 'proposal', 'negotiation', 'close'];
 const STAGE_LABELS: Record<string, string> = {
@@ -92,6 +130,14 @@ export default function CustomerDetailPage({ params }: { params: { id: string } 
   const [customer, setCustomer] = useState<Customer | null>(null);
   const [loading, setLoading] = useState(true);
   const [copied, setCopied] = useState(false);
+  const [showEdit, setShowEdit] = useState(false);
+  const [editForm, setEditForm] = useState<{
+    company_name: string; industry: string; region: string; company_size: string;
+    website: string; current_cloud: string; priority_label: string; entry_points: string[];
+    estimated_arr: string; why_now: string; opening_pitch: string;
+    pain_points: string[]; tech_stack: string[];
+  } | null>(null);
+  const [saving, setSaving] = useState(false);
 
   useEffect(() => {
     fetch(`/api/customers/${id}`)
@@ -102,6 +148,49 @@ export default function CustomerDetailPage({ params }: { params: { id: string } 
       })
       .catch(() => setLoading(false));
   }, [id]);
+
+  const openEdit = () => {
+    if (!customer) return;
+    setEditForm({
+      company_name: customer.company_name,
+      industry: customer.industry || '',
+      region: customer.region || '',
+      company_size: customer.company_size || '',
+      website: customer.website || '',
+      current_cloud: customer.current_cloud || '',
+      priority_label: customer.priority_label,
+      entry_points: customer.entry_points,
+      estimated_arr: customer.estimated_arr ? String(customer.estimated_arr) : '',
+      why_now: customer.why_now || '',
+      opening_pitch: customer.opening_pitch || '',
+      pain_points: customer.pain_points,
+      tech_stack: customer.tech_stack,
+    });
+    setShowEdit(true);
+  };
+
+  const handleSave = async () => {
+    if (!editForm || !customer) return;
+    setSaving(true);
+    try {
+      const res = await fetch(`/api/customers/${id}`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          ...editForm,
+          estimated_arr: editForm.estimated_arr ? parseInt(editForm.estimated_arr) : null,
+        }),
+      });
+      if (!res.ok) throw new Error();
+      const updated = await res.json();
+      setCustomer((prev) => prev ? { ...prev, ...updated } : prev);
+      setShowEdit(false);
+    } catch {
+      alert('儲存失敗');
+    } finally {
+      setSaving(false);
+    }
+  };
 
   const handleCopyPitch = () => {
     if (!customer?.opening_pitch) return;
@@ -137,6 +226,143 @@ export default function CustomerDetailPage({ params }: { params: { id: string } 
 
   return (
     <div className="max-w-5xl mx-auto">
+      {/* Edit Modal */}
+      {showEdit && editForm && (
+        <div className="fixed inset-0 bg-black/70 z-50 flex items-start justify-end" onClick={() => setShowEdit(false)}>
+          <div
+            className="bg-gray-950 border-l border-gray-800 h-full w-full max-w-lg overflow-y-auto p-6"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="flex items-center justify-between mb-5">
+              <h2 className="text-white font-bold text-lg">編輯客戶資料</h2>
+              <button onClick={() => setShowEdit(false)} className="text-gray-500 hover:text-white text-xl leading-none">×</button>
+            </div>
+
+            <div className="space-y-4">
+              <div>
+                <label className="text-gray-400 text-xs mb-1 block">公司名稱 *</label>
+                <input type="text" value={editForm.company_name}
+                  onChange={(e) => setEditForm({ ...editForm, company_name: e.target.value })}
+                  className="w-full bg-gray-800 border border-gray-700 rounded-lg px-3 py-2 text-white text-sm outline-none focus:border-blue-600" />
+              </div>
+
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="text-gray-400 text-xs mb-1 block">產業</label>
+                  <select value={editForm.industry} onChange={(e) => setEditForm({ ...editForm, industry: e.target.value })}
+                    className="w-full bg-gray-800 border border-gray-700 rounded-lg px-3 py-2 text-white text-sm outline-none">
+                    <option value="">選擇產業</option>
+                    {INDUSTRY_OPTIONS.map((o) => <option key={o} value={o}>{o}</option>)}
+                  </select>
+                </div>
+                <div>
+                  <label className="text-gray-400 text-xs mb-1 block">地區</label>
+                  <select value={editForm.region} onChange={(e) => setEditForm({ ...editForm, region: e.target.value })}
+                    className="w-full bg-gray-800 border border-gray-700 rounded-lg px-3 py-2 text-white text-sm outline-none">
+                    <option value="">選擇地區</option>
+                    {REGION_OPTIONS.map((o) => <option key={o} value={o}>{o}</option>)}
+                  </select>
+                </div>
+                <div>
+                  <label className="text-gray-400 text-xs mb-1 block">公司規模</label>
+                  <select value={editForm.company_size} onChange={(e) => setEditForm({ ...editForm, company_size: e.target.value })}
+                    className="w-full bg-gray-800 border border-gray-700 rounded-lg px-3 py-2 text-white text-sm outline-none">
+                    <option value="">選擇規模</option>
+                    {SIZE_OPTIONS.map((o) => <option key={o} value={o}>{o}</option>)}
+                  </select>
+                </div>
+                <div>
+                  <label className="text-gray-400 text-xs mb-1 block">目前使用雲</label>
+                  <select value={editForm.current_cloud} onChange={(e) => setEditForm({ ...editForm, current_cloud: e.target.value })}
+                    className="w-full bg-gray-800 border border-gray-700 rounded-lg px-3 py-2 text-white text-sm outline-none">
+                    <option value="">選擇雲服務</option>
+                    {CLOUD_OPTIONS.map((o) => <option key={o} value={o}>{o}</option>)}
+                  </select>
+                </div>
+                <div>
+                  <label className="text-gray-400 text-xs mb-1 block">優先級</label>
+                  <select value={editForm.priority_label} onChange={(e) => setEditForm({ ...editForm, priority_label: e.target.value })}
+                    className="w-full bg-gray-800 border border-gray-700 rounded-lg px-3 py-2 text-white text-sm outline-none">
+                    {PRIORITY_OPTIONS.map((o) => <option key={o} value={o}>{o}</option>)}
+                  </select>
+                </div>
+                <div>
+                  <label className="text-gray-400 text-xs mb-1 block">預估 ARR (USD)</label>
+                  <input type="number" value={editForm.estimated_arr}
+                    onChange={(e) => setEditForm({ ...editForm, estimated_arr: e.target.value })}
+                    placeholder="e.g. 120000"
+                    className="w-full bg-gray-800 border border-gray-700 rounded-lg px-3 py-2 text-white text-sm outline-none focus:border-blue-600 placeholder-gray-600" />
+                </div>
+              </div>
+
+              <div>
+                <label className="text-gray-400 text-xs mb-1 block">官網</label>
+                <input type="url" value={editForm.website}
+                  onChange={(e) => setEditForm({ ...editForm, website: e.target.value })}
+                  placeholder="https://"
+                  className="w-full bg-gray-800 border border-gray-700 rounded-lg px-3 py-2 text-white text-sm outline-none focus:border-blue-600 placeholder-gray-600" />
+              </div>
+
+              <div>
+                <label className="text-gray-400 text-xs mb-2 block">切入點</label>
+                <div className="flex flex-wrap gap-2">
+                  {ENTRY_POINT_OPTIONS.map((ep) => (
+                    <button key={ep} type="button"
+                      onClick={() => setEditForm({
+                        ...editForm,
+                        entry_points: editForm.entry_points.includes(ep)
+                          ? editForm.entry_points.filter((e) => e !== ep)
+                          : [...editForm.entry_points, ep],
+                      })}
+                      className={`text-xs px-3 py-1 rounded-full border transition-colors ${
+                        editForm.entry_points.includes(ep)
+                          ? 'bg-blue-600 border-blue-500 text-white'
+                          : 'bg-transparent border-gray-700 text-gray-400 hover:border-gray-500'
+                      }`}
+                    >{ep}</button>
+                  ))}
+                </div>
+              </div>
+
+              <div>
+                <label className="text-gray-400 text-xs mb-1 block">為什麼是現在</label>
+                <textarea value={editForm.why_now} onChange={(e) => setEditForm({ ...editForm, why_now: e.target.value })}
+                  rows={2} className="w-full bg-gray-800 border border-gray-700 rounded-lg px-3 py-2 text-white text-sm outline-none resize-none focus:border-blue-600" />
+              </div>
+
+              <div>
+                <label className="text-gray-400 text-xs mb-1 block">開場白建議</label>
+                <textarea value={editForm.opening_pitch} onChange={(e) => setEditForm({ ...editForm, opening_pitch: e.target.value })}
+                  rows={3} className="w-full bg-gray-800 border border-gray-700 rounded-lg px-3 py-2 text-white text-sm outline-none resize-none focus:border-blue-600" />
+              </div>
+
+              <div>
+                <label className="text-gray-400 text-xs mb-1 block">痛點</label>
+                <TagInput tags={editForm.pain_points} onChange={(t) => setEditForm({ ...editForm, pain_points: t })}
+                  placeholder="Enter 分隔..." colorClass="bg-red-900/40 text-red-300" />
+              </div>
+
+              <div>
+                <label className="text-gray-400 text-xs mb-1 block">技術棧</label>
+                <TagInput tags={editForm.tech_stack} onChange={(t) => setEditForm({ ...editForm, tech_stack: t })}
+                  placeholder="Enter 分隔..." />
+              </div>
+            </div>
+
+            <div className="flex gap-3 mt-6">
+              <button onClick={handleSave} disabled={saving}
+                className="flex-1 py-2.5 rounded-lg bg-blue-600 hover:bg-blue-500 disabled:opacity-50 text-white text-sm font-medium transition-colors">
+                {saving ? '儲存中...' : '儲存變更'}
+              </button>
+              <button onClick={() => setShowEdit(false)}
+                className="px-5 py-2.5 rounded-lg bg-gray-800 hover:bg-gray-700 text-gray-300 text-sm transition-colors">
+                取消
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* Back button */}
       <Link href="/prospects" className="text-gray-500 hover:text-gray-300 text-sm mb-4 block">
         ← 返回客戶列表
@@ -160,7 +386,7 @@ export default function CustomerDetailPage({ params }: { params: { id: string } 
           >
             + 新增會議記錄
           </Link>
-          <button className="px-4 py-2 rounded-lg bg-gray-800 hover:bg-gray-700 text-gray-300 text-sm transition-colors">
+          <button onClick={openEdit} className="px-4 py-2 rounded-lg bg-gray-800 hover:bg-gray-700 text-gray-300 text-sm transition-colors">
             編輯資料
           </button>
         </div>
