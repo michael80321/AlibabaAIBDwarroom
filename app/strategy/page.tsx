@@ -3,6 +3,7 @@ import { prisma } from '@/lib/prisma';
 import { format } from 'date-fns';
 import { zhTW } from 'date-fns/locale';
 import Link from 'next/link';
+import TelegramTestButton from '@/components/TelegramTestButton';
 
 async function getStrategyData() {
   const today = new Date();
@@ -48,7 +49,10 @@ export default async function StrategyPage() {
   return (
     <div>
       <div className="mb-6">
-        <h1 className="text-2xl font-bold text-white mb-1">🧠 策略中心</h1>
+        <div className="flex items-start justify-between mb-2">
+          <h1 className="text-2xl font-bold text-white">🧠 策略中心</h1>
+          <TelegramTestButton />
+        </div>
         <div className="bg-amber-950/30 border border-amber-800/50 rounded-lg px-4 py-2">
           <p className="text-amber-300 text-sm">
             {top3Actions[0]
