@@ -4,6 +4,7 @@ import { format } from 'date-fns';
 import { zhTW } from 'date-fns/locale';
 import Link from 'next/link';
 import TelegramTestButton from '@/components/TelegramTestButton';
+import GenerateStrategyButton from '@/components/GenerateStrategyButton';
 
 async function getStrategyData() {
   const today = new Date();
@@ -114,7 +115,8 @@ export default async function StrategyPage() {
             ) : (
               <div className="text-center py-8">
                 <p className="text-gray-600 mb-2">今日策略尚未生成</p>
-                <p className="text-gray-700 text-xs">每天 06:30 自動生成，或手動觸發</p>
+                <p className="text-gray-700 text-xs mb-3">每天 06:30 自動生成，或手動觸發</p>
+                <GenerateStrategyButton />
               </div>
             )}
           </div>

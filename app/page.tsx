@@ -7,6 +7,7 @@ import CustomerCard from '@/components/CustomerCard';
 import VendorStatusBadge from '@/components/VendorStatusBadge';
 import AlertBanner from '@/components/AlertBanner';
 import Link from 'next/link';
+import GenerateStrategyButton from '@/components/GenerateStrategyButton';
 
 async function getWarRoomData() {
   const today = new Date();
@@ -142,12 +143,7 @@ export default async function WarRoomPage() {
             ) : (
               <div className="text-center py-8">
                 <p className="text-gray-600 text-sm">今日策略尚未生成</p>
-                <Link
-                  href="/api/strategy/today"
-                  className="text-blue-400 text-xs hover:text-blue-300 mt-2 block"
-                >
-                  點此生成 →
-                </Link>
+                <GenerateStrategyButton />
               </div>
             )}
 
