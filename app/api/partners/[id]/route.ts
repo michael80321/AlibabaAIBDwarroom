@@ -15,19 +15,9 @@ export async function PUT(
   { params }: { params: { id: string } }
 ) {
   const body = await req.json();
-  const partner = await prisma.partner.update({
-    where: { id: params.id },
-    data: {
-      name: body.name,
-      type: body.type,
-      services: body.services,
-      regions: body.regions,
-      cloud_alliances: body.cloud_alliances,
-      cooperation_type: body.cooperation_type,
-      contact_info: body.contact_info,
-      notes: body.notes,
-    },
-  });
+  const FIELDS = ['name', 'type', 'services', 'regions', 'cloud_alliances', 'cooperation_type', 'contact_info', 'notes'] as const;
+  const data = Object.fromEntries(FIELDS.filter((f) => f in body).map((f) => [f, body[f]]));
+  const partner = await prisma.partner.update({ where: { id: params.id }, data });
   return NextResponse.json(partner);
 }
 

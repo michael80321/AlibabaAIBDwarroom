@@ -16,13 +16,16 @@ export default function AbandonButton({ customerId, customerName, onAbandoned }:
   const handleAbandon = async () => {
     setLoading(true);
     try {
-      await fetch(`/api/customers/${customerId}`, {
+      const res = await fetch(`/api/customers/${customerId}`, {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ priority_label: 'Lost' }),
       });
+      if (!res.ok) throw new Error();
       setDone(true);
       onAbandoned?.(customerId);
+    } catch {
+      alert('操作失敗，請稍後再試');
     } finally {
       setLoading(false);
       setConfirming(false);

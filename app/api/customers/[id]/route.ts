@@ -28,23 +28,19 @@ export async function PUT(
 ) {
   const body = await req.json();
 
+  const FIELDS = [
+    'company_name', 'industry', 'region', 'company_size', 'website',
+    'current_cloud', 'priority_label', 'entry_points', 'estimated_arr',
+    'why_now', 'opening_pitch', 'pain_points', 'tech_stack',
+  ] as const;
+
+  const data = Object.fromEntries(
+    FIELDS.filter((f) => f in body).map((f) => [f, body[f]])
+  );
+
   const customer = await prisma.customer.update({
     where: { id: params.id },
-    data: {
-      company_name: body.company_name,
-      industry: body.industry,
-      region: body.region,
-      company_size: body.company_size,
-      website: body.website,
-      current_cloud: body.current_cloud,
-      priority_label: body.priority_label,
-      entry_points: body.entry_points,
-      estimated_arr: body.estimated_arr,
-      why_now: body.why_now,
-      opening_pitch: body.opening_pitch,
-      pain_points: body.pain_points,
-      tech_stack: body.tech_stack,
-    },
+    data,
   });
 
   return NextResponse.json(customer);

@@ -86,11 +86,12 @@ export default function PipelineKanban({ items: initialItems }: PipelineKanbanPr
     );
 
     try {
-      await fetch(`/api/pipeline/${id}`, {
+      const res = await fetch(`/api/pipeline/${id}`, {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ stage: newStage }),
       });
+      if (!res.ok) throw new Error();
     } catch {
       // Revert on failure
       setItems((prev) =>
