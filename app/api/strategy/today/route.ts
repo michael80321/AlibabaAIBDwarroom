@@ -47,16 +47,21 @@ export async function GET() {
       recentIncidents,
     });
 
-    if (result) {
-      strategy = await prisma.dailyStrategy.create({
-        data: {
-          date: today,
-          top3_actions: result.top3_actions,
-          weekly_focus: result.weekly_focus,
-          abandon_list: result.abandon_list,
-        },
-      });
+    if (!result) {
+      return NextResponse.json(
+        { error: '生成失敗，請檢查 ANTHROPIC_API_KEY 環境變數' },
+        { status: 500 }
+      );
     }
+
+    strategy = await prisma.dailyStrategy.create({
+      data: {
+        date: today,
+        top3_actions: result.top3_actions,
+        weekly_focus: result.weekly_focus,
+        abandon_list: result.abandon_list,
+      },
+    });
   }
 
   return NextResponse.json(strategy);

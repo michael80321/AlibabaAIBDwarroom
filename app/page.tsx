@@ -6,6 +6,7 @@ import WarRoomCommandCard from '@/components/WarRoomCommandCard';
 import CustomerCard from '@/components/CustomerCard';
 import VendorStatusBadge from '@/components/VendorStatusBadge';
 import AlertBanner from '@/components/AlertBanner';
+import GenerateStrategyButton from '@/components/GenerateStrategyButton';
 import Link from 'next/link';
 
 async function getWarRoomData() {
@@ -140,15 +141,7 @@ export default async function WarRoomPage() {
                 })}
               </div>
             ) : (
-              <div className="text-center py-8">
-                <p className="text-gray-600 text-sm">今日策略尚未生成</p>
-                <Link
-                  href="/api/strategy/today"
-                  className="text-blue-400 text-xs hover:text-blue-300 mt-2 block"
-                >
-                  點此生成 →
-                </Link>
-              </div>
+              <GenerateStrategyButton />
             )}
 
             {/* Abandon List */}
