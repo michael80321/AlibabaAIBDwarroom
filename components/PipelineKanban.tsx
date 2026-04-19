@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useRef } from 'react';
 import Link from 'next/link';
 
 interface PipelineItem {
@@ -43,8 +43,11 @@ function getDaysStuck(enteredAt: string | Date): number {
   return Math.floor((Date.now() - new Date(enteredAt).getTime()) / (1000 * 60 * 60 * 24));
 }
 
-export default function PipelineKanban({ items }: PipelineKanbanProps) {
+export default function PipelineKanban({ items: initialItems }: PipelineKanbanProps) {
+  const [items, setItems] = useState(initialItems);
   const [selectedItem, setSelectedItem] = useState<string | null>(null);
+  const [dragOverStage, setDragOverStage] = useState<string | null>(null);
+  const draggingId = useRef<string | null>(null);
 
   const grouped = STAGES.reduce(
     (acc, stage) => {
@@ -56,6 +59,50 @@ export default function PipelineKanban({ items }: PipelineKanbanProps) {
 
   const totalValue = items.reduce((sum, i) => sum + (i.deal_value || 0), 0);
   const stuckCount = items.filter((i) => getDaysStuck(i.entered_at) > 14).length;
+
+  const handleDragStart = (e: React.DragEvent, itemId: string) => {
+    draggingId.current = itemId;
+    e.dataTransfer.effectAllowed = 'move';
+  };
+
+  const handleDragOver = (e: React.DragEvent, stageKey: string) => {
+    e.preventDefault();
+    e.dataTransfer.dropEffect = 'move';
+    setDragOverStage(stageKey);
+  };
+
+  const handleDrop = async (e: React.DragEvent, newStage: string) => {
+    e.preventDefault();
+    setDragOverStage(null);
+    const id = draggingId.current;
+    if (!id) return;
+
+    const item = items.find((i) => i.id === id);
+    if (!item || item.stage === newStage) return;
+
+    // Optimistic update
+    setItems((prev) =>
+      prev.map((i) => (i.id === id ? { ...i, stage: newStage } : i))
+    );
+
+    try {
+      await fetch(`/api/pipeline/${id}`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ stage: newStage }),
+      });
+    } catch {
+      // Revert on failure
+      setItems((prev) =>
+        prev.map((i) => (i.id === id ? { ...i, stage: item.stage } : i))
+      );
+    }
+  };
+
+  const handleDragEnd = () => {
+    draggingId.current = null;
+    setDragOverStage(null);
+  };
 
   return (
     <div>
@@ -73,6 +120,7 @@ export default function PipelineKanban({ items }: PipelineKanbanProps) {
           <p className="text-gray-500 text-xs">總商機數</p>
           <p className="text-white font-bold">{items.length}</p>
         </div>
+        <p className="text-gray-600 text-xs self-center ml-auto">拖拉卡片可換階段</p>
       </div>
 
       {/* Kanban */}
@@ -80,9 +128,16 @@ export default function PipelineKanban({ items }: PipelineKanbanProps) {
         {STAGES.map((stage) => {
           const stageItems = grouped[stage.key] || [];
           const stageValue = stageItems.reduce((sum, i) => sum + (i.deal_value || 0), 0);
+          const isOver = dragOverStage === stage.key;
 
           return (
-            <div key={stage.key} className={`flex-shrink-0 w-56 bg-gray-900 rounded-xl border-t-2 ${stage.color}`}>
+            <div
+              key={stage.key}
+              className={`flex-shrink-0 w-56 bg-gray-900 rounded-xl border-t-2 ${stage.color} transition-colors ${isOver ? 'ring-1 ring-blue-500 bg-gray-800' : ''}`}
+              onDragOver={(e) => handleDragOver(e, stage.key)}
+              onDragLeave={() => setDragOverStage(null)}
+              onDrop={(e) => handleDrop(e, stage.key)}
+            >
               {/* Column Header */}
               <div className="p-3 border-b border-gray-800">
                 <p className="text-white font-semibold text-sm">{stage.label}</p>
@@ -102,7 +157,10 @@ export default function PipelineKanban({ items }: PipelineKanbanProps) {
                   return (
                     <div
                       key={item.id}
-                      className={`bg-gray-800 rounded-lg p-3 cursor-pointer hover:bg-gray-750 transition-colors ${
+                      draggable
+                      onDragStart={(e) => handleDragStart(e, item.id)}
+                      onDragEnd={handleDragEnd}
+                      className={`bg-gray-800 rounded-lg p-3 cursor-grab active:cursor-grabbing hover:bg-gray-750 transition-colors select-none ${
                         selectedItem === item.id ? 'ring-1 ring-blue-500' : ''
                       }`}
                       onClick={() => setSelectedItem(selectedItem === item.id ? null : item.id)}
@@ -143,8 +201,8 @@ export default function PipelineKanban({ items }: PipelineKanbanProps) {
                 })}
 
                 {stageItems.length === 0 && (
-                  <div className="flex items-center justify-center h-20 text-gray-700 text-xs">
-                    沒有商機
+                  <div className={`flex items-center justify-center h-20 text-xs transition-colors ${isOver ? 'text-blue-400' : 'text-gray-700'}`}>
+                    {isOver ? '放開以移入' : '沒有商機'}
                   </div>
                 )}
               </div>

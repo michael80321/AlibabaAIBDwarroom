@@ -4,6 +4,7 @@ import { useEffect, useState } from 'react';
 import { format } from 'date-fns';
 import { zhTW } from 'date-fns/locale';
 import PriorityBadge from '@/components/PriorityBadge';
+import EditCustomerModal from '@/components/EditCustomerModal';
 import Link from 'next/link';
 
 const STAGE_ORDER = ['lead', 'meeting', 'poc', 'proposal', 'negotiation', 'close'];
@@ -92,6 +93,7 @@ export default function CustomerDetailPage({ params }: { params: { id: string } 
   const [customer, setCustomer] = useState<Customer | null>(null);
   const [loading, setLoading] = useState(true);
   const [copied, setCopied] = useState(false);
+  const [editOpen, setEditOpen] = useState(false);
 
   useEffect(() => {
     fetch(`/api/customers/${id}`)
@@ -137,6 +139,16 @@ export default function CustomerDetailPage({ params }: { params: { id: string } 
 
   return (
     <div className="max-w-5xl mx-auto">
+      {editOpen && (
+        <EditCustomerModal
+          customer={customer}
+          onClose={() => setEditOpen(false)}
+          onSaved={(updated) => {
+            setCustomer((prev) => prev ? { ...prev, ...updated } : prev);
+            setEditOpen(false);
+          }}
+        />
+      )}
       {/* Back button */}
       <Link href="/prospects" className="text-gray-500 hover:text-gray-300 text-sm mb-4 block">
         ← 返回客戶列表
@@ -160,7 +172,10 @@ export default function CustomerDetailPage({ params }: { params: { id: string } 
           >
             + 新增會議記錄
           </Link>
-          <button className="px-4 py-2 rounded-lg bg-gray-800 hover:bg-gray-700 text-gray-300 text-sm transition-colors">
+          <button
+            onClick={() => setEditOpen(true)}
+            className="px-4 py-2 rounded-lg bg-gray-800 hover:bg-gray-700 text-gray-300 text-sm transition-colors"
+          >
             編輯資料
           </button>
         </div>

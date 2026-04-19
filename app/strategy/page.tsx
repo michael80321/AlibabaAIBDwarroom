@@ -3,6 +3,7 @@ import { prisma } from '@/lib/prisma';
 import { format } from 'date-fns';
 import { zhTW } from 'date-fns/locale';
 import Link from 'next/link';
+import AbandonButton from '@/components/AbandonButton';
 
 async function getStrategyData() {
   const today = new Date();
@@ -172,9 +173,7 @@ export default async function StrategyPage() {
                   <div key={i} className="p-3 bg-gray-800/50 rounded-lg">
                     <p className="text-white text-sm font-medium">{item.customer_name}</p>
                     <p className="text-gray-500 text-xs mt-0.5">{item.reason}</p>
-                    <button className="text-xs text-red-400 hover:text-red-300 mt-2">
-                      確認放棄 →
-                    </button>
+                    <AbandonButton customerId={item.customer_id} customerName={item.customer_name} />
                   </div>
                 ))}
               </div>
