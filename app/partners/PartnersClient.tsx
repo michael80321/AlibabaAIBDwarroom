@@ -25,6 +25,7 @@ interface PartnerProspect {
   cooperation_type: string | null;
   status: string;
   status_reason: string | null;
+  recommended_date: Date | string;
 }
 
 const TYPES = [
@@ -38,7 +39,15 @@ const TYPES = [
   { key: 'gpu_vendor', label: 'GPU 硬體商' },
 ];
 
-const REGIONS = ['all', 'TW', 'SEA', 'HK', 'APAC', 'Global'];
+const REGIONS: { key: string; label: string }[] = [
+  { key: 'all', label: '全部' },
+  { key: 'TW', label: '台灣' },
+  { key: 'HK', label: '香港' },
+  { key: 'CN', label: '大陸' },
+  { key: 'SG', label: '新加坡' },
+  { key: 'MY', label: '馬來西亞' },
+  { key: 'APAC', label: '亞太地區' },
+];
 
 const PARTNER_STATUSES = [
   { key: 'all', label: '全部' },
@@ -61,16 +70,35 @@ export default function PartnersClient({
   const [type, setType] = useState('all');
   const [region, setRegion] = useState('all');
   const [status, setStatus] = useState('all');
+  const [timeRange, setTimeRange] = useState<'today' | '7d' | 'all'>('all');
   const [updating, setUpdating] = useState<string | null>(null);
 
+  const todayCount = useMemo(() => {
+    const start = new Date(); start.setHours(0, 0, 0, 0);
+    return prospects.filter((p) => new Date(p.recommended_date) >= start).length;
+  }, [prospects]);
+
+  const sevenDayCount = useMemo(() => {
+    const start = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000);
+    return prospects.filter((p) => new Date(p.recommended_date) >= start).length;
+  }, [prospects]);
+
   const filtered = useMemo(() => {
+    const todayStart = new Date(); todayStart.setHours(0, 0, 0, 0);
+    const sevenDaysAgo = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000);
     return prospects.filter((p) => {
+      if (timeRange === 'today' && new Date(p.recommended_date) < todayStart) return false;
+      if (timeRange === '7d' && new Date(p.recommended_date) < sevenDaysAgo) return false;
       if (type !== 'all' && p.type !== type) return false;
-      if (region !== 'all' && p.region !== region) return false;
+      if (region !== 'all') {
+        if (region === 'APAC') {
+          if (!['APAC', 'SEA', 'Global'].includes(p.region)) return false;
+        } else if (p.region !== region) return false;
+      }
       if (status !== 'all' && p.status !== status) return false;
       return true;
     });
-  }, [prospects, type, region, status]);
+  }, [prospects, type, region, status, timeRange]);
 
   async function updateStatus(id: string, newStatus: string) {
     setUpdating(id);
@@ -118,6 +146,28 @@ export default function PartnersClient({
 
       {view === 'prospects' ? (
         <>
+          {/* Time Range Filter */}
+          <div className="flex gap-1 mb-3">
+            <span className="text-xs text-gray-500 self-center mr-1">推薦時間:</span>
+            {([
+              { key: 'today', label: `今日 (${todayCount})` },
+              { key: '7d', label: `近 7 天 (${sevenDayCount})` },
+              { key: 'all', label: `全部 (${prospects.length})` },
+            ] as const).map((t) => (
+              <button
+                key={t.key}
+                onClick={() => setTimeRange(t.key)}
+                className={`px-3 py-1 rounded-full text-xs transition-colors ${
+                  timeRange === t.key
+                    ? 'bg-blue-600 text-white'
+                    : 'bg-gray-800 text-gray-400 hover:text-white'
+                }`}
+              >
+                {t.label}
+              </button>
+            ))}
+          </div>
+
           <div className="flex gap-1 mb-3 overflow-x-auto pb-1">
             {TYPES.map((t) => (
               <button
@@ -137,13 +187,13 @@ export default function PartnersClient({
               <span className="text-xs text-gray-500 self-center mr-1">地區:</span>
               {REGIONS.map((r) => (
                 <button
-                  key={r}
-                  onClick={() => setRegion(r)}
+                  key={r.key}
+                  onClick={() => setRegion(r.key)}
                   className={`px-2.5 py-1 rounded-full text-xs transition-colors ${
-                    region === r ? 'bg-purple-600 text-white' : 'bg-gray-800 text-gray-400 hover:text-white'
+                    region === r.key ? 'bg-purple-600 text-white' : 'bg-gray-800 text-gray-400 hover:text-white'
                   }`}
                 >
-                  {r === 'all' ? '全部' : r}
+                  {r.label}
                 </button>
               ))}
             </div>

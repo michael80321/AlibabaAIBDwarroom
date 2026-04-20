@@ -2,7 +2,7 @@
 export const prospectData2 = [
   // === Enterprise - SEA/HK ===
   {
-    company_name: 'Grab', category: 'enterprise', region: 'SEA',
+    company_name: 'Grab', category: 'enterprise', region: 'SG',
     description: '東南亞最大超級 App，叫車、外送、金融一站式',
     why_alibaba: '高併發 + 多國合規，Alibaba Cloud 在東南亞 6 個國家有 Region，法遵最齊全',
     estimated_arr: 1500000, website: 'https://www.grab.com', headcount: '5000+',
@@ -18,7 +18,7 @@ export const prospectData2 = [
     status: 'new',
   },
   {
-    company_name: 'Sea Group / Shopee', category: 'ecommerce', region: 'SEA',
+    company_name: 'Sea Group / Shopee', category: 'ecommerce', region: 'SG',
     description: '東南亞最大電商平台，同時經營 Garena 遊戲、SeaMoney',
     why_alibaba: '電商雙11流量場景完美對應 Alibaba 經驗；GPU 需求大（AI 推薦）',
     estimated_arr: 2000000, website: 'https://www.seagroup.com', headcount: '10000+',
@@ -50,7 +50,7 @@ export const prospectData2 = [
     status: 'new',
   },
   {
-    company_name: 'Singtel', category: 'enterprise', region: 'SEA',
+    company_name: 'Singtel', category: 'enterprise', region: 'SG',
     description: '新加坡最大電信，東南亞布局最廣',
     why_alibaba: '與 Alibaba Cloud 有戰略合作可能，電信雲互補，企業客戶共銷',
     estimated_arr: 700000, website: 'https://www.singtel.com', headcount: '10000+',
@@ -74,7 +74,7 @@ export const prospectData2 = [
     status: 'new',
   },
   {
-    company_name: 'Razer', category: 'enterprise', region: 'SEA',
+    company_name: 'Razer', category: 'enterprise', region: 'SG',
     description: '遊戲硬體 + 雲遊戲平台，新加坡總部',
     why_alibaba: '雲遊戲需要低延遲全球 CDN，Alibaba Cloud GSLB 全球加速',
     estimated_arr: 350000, website: 'https://www.razer.com', headcount: '2000+',
