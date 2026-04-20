@@ -88,16 +88,33 @@ export default function ProspectsClient({
   const [category, setCategory] = useState('all');
   const [region, setRegion] = useState('all');
   const [status, setStatus] = useState('all');
+  const [timeRange, setTimeRange] = useState<'today' | '7d' | 'all'>('all');
   const [updating, setUpdating] = useState<string | null>(null);
 
+  const todayCount = useMemo(() => {
+    const start = new Date(); start.setHours(0, 0, 0, 0);
+    return prospects.filter((p) => new Date(p.recommended_date) >= start).length;
+  }, [prospects]);
+
+  const sevenDayCount = useMemo(() => {
+    const start = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000);
+    return prospects.filter((p) => new Date(p.recommended_date) >= start).length;
+  }, [prospects]);
+
   const filtered = useMemo(() => {
+    const now = new Date();
+    const todayStart = new Date(now); todayStart.setHours(0, 0, 0, 0);
+    const sevenDaysAgo = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000);
+
     return prospects.filter((p) => {
+      if (timeRange === 'today' && new Date(p.recommended_date) < todayStart) return false;
+      if (timeRange === '7d' && new Date(p.recommended_date) < sevenDaysAgo) return false;
       if (category !== 'all' && p.category !== category) return false;
       if (region !== 'all' && p.region !== region) return false;
       if (status !== 'all' && p.status !== status) return false;
       return true;
     });
-  }, [prospects, category, region, status]);
+  }, [prospects, category, region, status, timeRange]);
 
   const stats = useMemo(() => {
     return {
@@ -186,6 +203,28 @@ export default function ProspectsClient({
               <div className="text-xs text-gray-400">無法跟進</div>
               <div className="text-xl font-bold text-white">{stats.cant_pursue}</div>
             </div>
+          </div>
+
+          {/* Time Range Filter */}
+          <div className="flex gap-1 mb-3">
+            <span className="text-xs text-gray-500 self-center mr-1">推薦時間:</span>
+            {([
+              { key: 'today', label: `今日 (${todayCount})` },
+              { key: '7d', label: `近 7 天 (${sevenDayCount})` },
+              { key: 'all', label: `全部 (${prospects.length})` },
+            ] as const).map((t) => (
+              <button
+                key={t.key}
+                onClick={() => setTimeRange(t.key)}
+                className={`px-3 py-1 rounded-full text-xs transition-colors ${
+                  timeRange === t.key
+                    ? 'bg-blue-600 text-white'
+                    : 'bg-gray-800 text-gray-400 hover:text-white'
+                }`}
+              >
+                {t.label}
+              </button>
+            ))}
           </div>
 
           {/* Category Tabs */}

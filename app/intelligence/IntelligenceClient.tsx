@@ -65,10 +65,44 @@ const CATEGORY_STYLES: Record<string, string> = {
   news: 'bg-gray-800 text-gray-300',
 };
 
-export default function IntelligenceClient({ statuses, incidents, news, partners }: Props) {
+export default function IntelligenceClient({ statuses: initialStatuses, incidents: initialIncidents, news: initialNews, partners }: Props) {
   const [activeTab, setActiveTab] = useState<'status' | 'news' | 'partners'>('status');
   const [vendorFilter, setVendorFilter] = useState('');
   const [categoryFilter, setCategoryFilter] = useState('');
+  const [statuses, setStatuses] = useState(initialStatuses);
+  const [incidents, setIncidents] = useState(initialIncidents);
+  const [news, setNews] = useState(initialNews);
+  const [refreshingStatus, setRefreshingStatus] = useState(false);
+  const [refreshingNews, setRefreshingNews] = useState(false);
+  const [refreshMsg, setRefreshMsg] = useState<string | null>(null);
+
+  const handleCheckStatus = async () => {
+    setRefreshingStatus(true);
+    setRefreshMsg(null);
+    try {
+      const res = await fetch('/api/admin/check-status', { method: 'POST' });
+      if (!res.ok) throw new Error();
+      setRefreshMsg('廠商狀態已更新，請重新整理頁面查看最新資料');
+    } catch {
+      setRefreshMsg('更新失敗，請稍後再試');
+    } finally {
+      setRefreshingStatus(false);
+    }
+  };
+
+  const handleRefreshNews = async () => {
+    setRefreshingNews(true);
+    setRefreshMsg(null);
+    try {
+      const res = await fetch('/api/admin/refresh-news', { method: 'POST' });
+      if (!res.ok) throw new Error();
+      setRefreshMsg('新聞抓取完成，請重新整理頁面查看最新資料');
+    } catch {
+      setRefreshMsg('抓取失敗，請稍後再試');
+    } finally {
+      setRefreshingNews(false);
+    }
+  };
 
   const filteredNews = news.filter((n) => {
     if (vendorFilter && n.vendor !== vendorFilter) return false;
@@ -81,7 +115,28 @@ export default function IntelligenceClient({ statuses, incidents, news, partners
   return (
     <div>
       <div className="mb-6">
-        <h1 className="text-2xl font-bold text-white mb-1">🌐 市場情報</h1>
+        <div className="flex items-start justify-between mb-2">
+          <h1 className="text-2xl font-bold text-white">🌐 市場情報</h1>
+          <div className="flex gap-2">
+            <button
+              onClick={handleCheckStatus}
+              disabled={refreshingStatus}
+              className="px-3 py-1.5 rounded-lg bg-gray-800 text-gray-300 hover:bg-gray-700 text-xs disabled:opacity-50 transition-colors"
+            >
+              {refreshingStatus ? '檢查中...' : '🔄 檢查廠商狀態'}
+            </button>
+            <button
+              onClick={handleRefreshNews}
+              disabled={refreshingNews}
+              className="px-3 py-1.5 rounded-lg bg-gray-800 text-gray-300 hover:bg-gray-700 text-xs disabled:opacity-50 transition-colors"
+            >
+              {refreshingNews ? '抓取中...' : '📰 手動更新新聞'}
+            </button>
+          </div>
+        </div>
+        {refreshMsg && (
+          <p className="text-green-400 text-xs mb-2">{refreshMsg}</p>
+        )}
         <div className="bg-amber-950/30 border border-amber-800/50 rounded-lg px-4 py-2">
           <p className="text-amber-300 text-sm">
             關注競品異常：有中斷或降級時，立即聯繫使用該雲的客戶
@@ -165,9 +220,9 @@ export default function IntelligenceClient({ statuses, incidents, news, partners
           </div>
 
           {/* Incident History */}
-          {incidents.length > 0 && (
-            <div className="mt-6">
-              <h3 className="text-white font-bold mb-3">事件記錄</h3>
+          <div className="mt-6">
+            <h3 className="text-white font-bold mb-3">事件記錄</h3>
+            {incidents.length > 0 ? (
               <div className="space-y-2">
                 {incidents.map((incident) => (
                   <div
@@ -192,8 +247,13 @@ export default function IntelligenceClient({ statuses, incidents, news, partners
                   </div>
                 ))}
               </div>
-            </div>
-          )}
+            ) : (
+              <div className="bg-gray-900 border border-gray-800 rounded-lg p-6 text-center">
+                <p className="text-green-400 text-sm font-medium mb-1">✓ 近期無事故紀錄</p>
+                <p className="text-gray-600 text-xs">點「檢查廠商狀態」可即時更新</p>
+              </div>
+            )}
+          </div>
         </div>
       )}
 
@@ -227,6 +287,12 @@ export default function IntelligenceClient({ statuses, incidents, news, partners
             </select>
           </div>
 
+          {filteredNews.length === 0 && (
+            <div className="bg-gray-900 border border-gray-800 rounded-xl p-8 text-center">
+              <p className="text-gray-500 text-sm mb-1">尚無新聞資料</p>
+              <p className="text-gray-700 text-xs">點右上角「手動更新新聞」立即抓取</p>
+            </div>
+          )}
           <div className="space-y-3">
             {filteredNews.map((item) => (
               <div key={item.id} className="bg-gray-900 border border-gray-800 rounded-xl p-4">
