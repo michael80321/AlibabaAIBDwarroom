@@ -12,6 +12,7 @@ const navItems = [
   { href: '/intelligence', label: '市場情報', icon: '🌐' },
   { href: '/strategy', label: '策略中心', icon: '🧠' },
   { href: '/meetings', label: '會議 AI 整理', icon: '📝' },
+  { href: '/admin', label: '管理後台', icon: '⚙️' },
 ];
 
 export default function Sidebar() {
