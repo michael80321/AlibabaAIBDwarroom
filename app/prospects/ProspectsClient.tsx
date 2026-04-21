@@ -65,7 +65,8 @@ const CATEGORY_LABEL: Record<string, string> = {
   fintech: 'Fintech',
 };
 
-const REGIONS = ['all', 'TW', 'SEA', 'HK', 'CN', 'APAC', 'Global'];
+const REGIONS = ['all', 'TW', 'CN', 'SEA', 'HK', 'APAC', 'Global'];
+const REGION_LABELS: Record<string, string> = { all: '全部', CN: '大陸' };
 
 const STATUSES = [
   { key: 'all', label: '全部' },
@@ -381,7 +382,7 @@ export default function ProspectsClient({
                       : 'bg-gray-800 text-gray-400 hover:text-white'
                   }`}
                 >
-                  {r === 'all' ? '全部' : r}
+                  {REGION_LABELS[r] ?? r}
                 </button>
               ))}
             </div>

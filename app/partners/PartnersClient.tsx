@@ -39,7 +39,8 @@ const TYPES = [
   { key: 'gpu_vendor', label: 'GPU 硬體商' },
 ];
 
-const REGIONS = ['all', 'TW', 'SEA', 'HK', 'APAC', 'Global'];
+const REGIONS = ['all', 'TW', 'CN', 'SEA', 'HK', 'APAC', 'Global'];
+const REGION_LABELS: Record<string, string> = { all: '全部', CN: '大陸' };
 
 const PARTNER_STATUSES = [
   { key: 'all', label: '全部' },
@@ -300,7 +301,7 @@ export default function PartnersClient({
                   className={`px-2.5 py-1 rounded-full text-xs transition-colors ${
                     region === r ? 'bg-purple-600 text-white' : 'bg-gray-800 text-gray-400 hover:text-white'
                   }`}>
-                  {r === 'all' ? '全部' : r}
+                  {REGION_LABELS[r] ?? r}
                 </button>
               ))}
             </div>
