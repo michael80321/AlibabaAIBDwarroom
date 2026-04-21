@@ -4,6 +4,7 @@ import { useEffect, useState, KeyboardEvent } from 'react';
 import { format } from 'date-fns';
 import { zhTW } from 'date-fns/locale';
 import PriorityBadge from '@/components/PriorityBadge';
+import EmailGeneratorModal from '@/components/EmailGeneratorModal';
 import Link from 'next/link';
 
 const ENTRY_POINT_OPTIONS = ['AI', 'GPU', 'CDN', 'Global', 'China', 'China Access', 'Cost', 'SEA'];
@@ -131,6 +132,7 @@ export default function CustomerDetailPage({ params }: { params: { id: string } 
   const [loading, setLoading] = useState(true);
   const [copied, setCopied] = useState(false);
   const [showEdit, setShowEdit] = useState(false);
+  const [emailModal, setEmailModal] = useState(false);
   const [editForm, setEditForm] = useState<{
     company_name: string; industry: string; region: string; company_size: string;
     website: string; current_cloud: string; priority_label: string; entry_points: string[];
@@ -226,6 +228,15 @@ export default function CustomerDetailPage({ params }: { params: { id: string } 
 
   return (
     <div className="max-w-5xl mx-auto">
+      {/* Email Generator Modal */}
+      {emailModal && customer && (
+        <EmailGeneratorModal
+          customerIds={[customer.id]}
+          customerNames={[customer.company_name]}
+          onClose={() => setEmailModal(false)}
+        />
+      )}
+
       {/* Edit Modal */}
       {showEdit && editForm && (
         <div className="fixed inset-0 bg-black/70 z-50 flex items-start justify-end" onClick={() => setShowEdit(false)}>
@@ -380,6 +391,12 @@ export default function CustomerDetailPage({ params }: { params: { id: string } 
           </p>
         </div>
         <div className="flex gap-2">
+          <button
+            onClick={() => setEmailModal(true)}
+            className="px-4 py-2 rounded-lg bg-green-700 hover:bg-green-600 text-white text-sm font-medium transition-colors"
+          >
+            ✉️ 生成開發信
+          </button>
           <Link
             href="/meetings"
             className="px-4 py-2 rounded-lg bg-purple-600 hover:bg-purple-500 text-white text-sm font-medium transition-colors"

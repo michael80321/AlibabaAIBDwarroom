@@ -4,6 +4,7 @@ import { useState, useMemo } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import CustomerCard from '@/components/CustomerCard';
+import EmailGeneratorModal from '@/components/EmailGeneratorModal';
 
 interface Prospect {
   id: string;
@@ -169,6 +170,8 @@ export default function ProspectsClient({
   const [status, setStatus] = useState('all');
   const [dateFilter, setDateFilter] = useState<'today' | 'week' | 'all'>('today');
   const [updating, setUpdating] = useState<string | null>(null);
+  const [selectedIds, setSelectedIds] = useState<string[]>([]);
+  const [emailModal, setEmailModal] = useState(false);
 
   // Modal state
   const [modal, setModal] = useState<{
@@ -176,6 +179,10 @@ export default function ProspectsClient({
     companyName: string;
     targetStatus: string;
   } | null>(null);
+
+  const selectedNames = customers
+    .filter((c) => selectedIds.includes(c.id))
+    .map((c) => c.company_name);
 
   const filtered = useMemo(() => {
     const now = new Date();
@@ -245,6 +252,14 @@ export default function ProspectsClient({
           targetStatus={modal.targetStatus}
           onConfirm={confirmStatusUpdate}
           onCancel={() => setModal(null)}
+        />
+      )}
+
+      {emailModal && selectedIds.length > 0 && (
+        <EmailGeneratorModal
+          customerIds={selectedIds}
+          customerNames={selectedNames}
+          onClose={() => setEmailModal(false)}
         />
       )}
 
@@ -410,11 +425,63 @@ export default function ProspectsClient({
         </>
       ) : (
         <>
-          <p className="text-gray-500 text-xs mb-3">共 {customers.length} 筆追蹤中客戶</p>
+          {/* Floating action bar */}
+          {selectedIds.length > 0 && (
+            <div className="fixed bottom-6 left-1/2 -translate-x-1/2 z-40 flex items-center gap-3 bg-gray-900 border border-gray-700 rounded-2xl px-5 py-3 shadow-2xl">
+              <span className="text-white text-sm font-medium">已選 {selectedIds.length} 個客戶</span>
+              <button
+                onClick={() => setEmailModal(true)}
+                className="px-4 py-2 rounded-xl bg-green-600 hover:bg-green-500 text-white text-sm font-bold transition-colors"
+              >
+                ✉️ 生成開發信
+              </button>
+              <button
+                onClick={() => setSelectedIds([])}
+                className="text-gray-500 hover:text-white text-xs"
+              >
+                取消選擇
+              </button>
+            </div>
+          )}
+
+          <div className="flex items-center justify-between mb-3">
+            <p className="text-gray-500 text-xs">共 {customers.length} 筆追蹤中客戶・點選卡片左上角勾選</p>
+            {selectedIds.length > 0 && (
+              <span className="text-blue-400 text-xs font-medium">{selectedIds.length} 筆已選（最多 5 筆）</span>
+            )}
+          </div>
+
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-            {customers.map((c) => (
-              <CustomerCard key={c.id} customer={c} />
-            ))}
+            {customers.map((c) => {
+              const isSelected = selectedIds.includes(c.id);
+              return (
+                <div key={c.id} className="relative">
+                  <div
+                    className={`absolute top-3 left-3 z-10 w-5 h-5 rounded border-2 flex items-center justify-center cursor-pointer transition-colors ${
+                      isSelected
+                        ? 'bg-blue-600 border-blue-600'
+                        : 'bg-gray-800 border-gray-600 hover:border-blue-500'
+                    }`}
+                    onClick={() => {
+                      if (isSelected) {
+                        setSelectedIds((prev) => prev.filter((id) => id !== c.id));
+                      } else if (selectedIds.length < 5) {
+                        setSelectedIds((prev) => [...prev, c.id]);
+                      }
+                    }}
+                  >
+                    {isSelected && <span className="text-white text-[10px] font-bold">✓</span>}
+                  </div>
+                  <div
+                    className={`transition-all rounded-xl ${
+                      isSelected ? 'ring-2 ring-blue-600 ring-offset-2 ring-offset-gray-950' : ''
+                    }`}
+                  >
+                    <CustomerCard customer={c} />
+                  </div>
+                </div>
+              );
+            })}
           </div>
         </>
       )}

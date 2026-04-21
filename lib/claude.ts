@@ -335,3 +335,90 @@ export async function summarizeNewsArticle(
     return null;
   }
 }
+
+export type EmailScenario = 'cold' | 'post_incident' | 'event_followup';
+
+export interface OutreachEmailResult {
+  subject_zh: string;
+  body_zh: string;
+  subject_en: string;
+  body_en: string;
+}
+
+export interface EmailContactInfo {
+  name?: string;
+  title?: string;
+  email?: string;
+}
+
+export async function generateOutreachEmail(
+  customer: {
+    company_name: string;
+    industry: string | null;
+    current_cloud: string | null;
+    pain_points: string[];
+    entry_points: string[];
+    why_now: string | null;
+    opening_pitch: string | null;
+    estimated_arr: number | null;
+  },
+  contact: EmailContactInfo,
+  scenario: EmailScenario,
+  incidentVendor?: string
+): Promise<OutreachEmailResult | null> {
+  try {
+    const recipientName = contact.name || '您好';
+    const recipientTitle = contact.title || '';
+
+    const scenarioContext = {
+      cold: '這是第一次主動接觸，對方不認識我們',
+      post_incident: `對方目前使用的 ${incidentVendor || customer.current_cloud} 剛發生服務中斷或異常`,
+      event_followup: '我們在活動或展會上見過面，現在做後續跟進',
+    }[scenario];
+
+    const prompt = `你是 Alibaba Cloud 台灣的資深 BD，擅長寫讓人忍不住想回信的商務開發信。
+
+客戶資料：
+- 公司：${customer.company_name}
+- 產業：${customer.industry || '未知'}
+- 目前使用雲：${customer.current_cloud || '未知'}
+- 痛點：${customer.pain_points.join('、') || '未知'}
+- 切入點：${customer.entry_points.join('、') || '未知'}
+- 時機：${customer.why_now || '未知'}
+- 建議開場白參考：${customer.opening_pitch || '無'}
+
+收件人：${recipientName}${recipientTitle ? `，${recipientTitle}` : ''}
+情境：${scenarioContext}
+
+寫信原則（非常重要）：
+1. 信不能超過 120 字（中文）/ 100 words（英文）
+2. 開頭第一句必須讓對方有共鳴或感到驚訝，不能用「我是 Alibaba Cloud 的...」開頭
+3. 只提 1 個核心價值，不要列清單
+4. 結尾是軟性 CTA：「15 分鐘電話，這週有空嗎？」風格
+5. 語氣：直接、有自信、像一個朋友告訴你一個好機會，不要像廣告
+6. 不要寫「貴公司」、「謹此」等正式套語
+7. 署名只寫 [你的名字] 和 Alibaba Cloud
+
+請輸出 JSON（只輸出 JSON，不要其他文字）：
+{
+  "subject_zh": "主旨（20字內，讓人忍不住點開）",
+  "body_zh": "中文信件內文（含稱呼，不含主旨）",
+  "subject_en": "Subject line (under 10 words, curiosity-driven)",
+  "body_en": "English email body (including greeting, excluding subject)"
+}`;
+
+    const message = await client.messages.create({
+      model: MODEL,
+      max_tokens: 1500,
+      messages: [{ role: 'user', content: prompt }],
+    });
+
+    const content = message.content[0];
+    if (content.type !== 'text') return null;
+    const jsonText = content.text.trim().replace(/^```json\n?/, '').replace(/\n?```$/, '');
+    return JSON.parse(jsonText) as OutreachEmailResult;
+  } catch (error) {
+    console.error('generateOutreachEmail error:', error);
+    return null;
+  }
+}
