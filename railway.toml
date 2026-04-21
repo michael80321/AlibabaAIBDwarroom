@@ -14,20 +14,26 @@ name    = "check-status"
 schedule = "*/10 * * * *"
 command = "curl -s -X POST $WAR_ROOM_URL/api/cron/check-status -H 'x-cron-secret: $CRON_SECRET'"
 
+# 新聞抓取：早 06:00 (UTC 22) 全量+AI摘要、午 12:00 (UTC 04) 輕量、傍晚 18:00 (UTC 10) 輕量
 [[crons]]
-name    = "fetch-news"
+name    = "fetch-news-morning"
 schedule = "0 22 * * *"
 command = "curl -s -X POST $WAR_ROOM_URL/api/cron/fetch-news -H 'x-cron-secret: $CRON_SECRET'"
+
+[[crons]]
+name    = "fetch-news-midday"
+schedule = "0 4 * * *"
+command = "curl -s -X POST $WAR_ROOM_URL/api/cron/news-midday -H 'x-cron-secret: $CRON_SECRET'"
+
+[[crons]]
+name    = "fetch-news-evening"
+schedule = "0 10 * * *"
+command = "curl -s -X POST $WAR_ROOM_URL/api/cron/news-midday -H 'x-cron-secret: $CRON_SECRET'"
 
 [[crons]]
 name    = "gen-strategy"
 schedule = "30 22 * * *"
 command = "curl -s -X POST $WAR_ROOM_URL/api/cron/gen-strategy -H 'x-cron-secret: $CRON_SECRET'"
-
-[[crons]]
-name    = "news-midday"
-schedule = "0 4 * * *"
-command = "curl -s -X POST $WAR_ROOM_URL/api/cron/news-midday -H 'x-cron-secret: $CRON_SECRET'"
 
 [[crons]]
 name    = "score-customers"
@@ -39,7 +45,13 @@ name    = "weekly-strategy"
 schedule = "0 23 * * 0"
 command = "curl -s -X POST $WAR_ROOM_URL/api/cron/gen-strategy?weekly=true -H 'x-cron-secret: $CRON_SECRET'"
 
+# 每天 07:00 (UTC 23) 釋出潛在客戶與合作夥伴推薦
 [[crons]]
 name    = "release-prospects"
 schedule = "0 23 * * *"
 command = "curl -s -X POST $WAR_ROOM_URL/api/cron/release-prospects -H 'x-cron-secret: $CRON_SECRET'"
+
+[[crons]]
+name    = "release-partner-prospects"
+schedule = "5 23 * * *"
+command = "curl -s -X POST $WAR_ROOM_URL/api/cron/release-partner-prospects -H 'x-cron-secret: $CRON_SECRET'"

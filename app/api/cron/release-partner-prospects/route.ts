@@ -7,9 +7,7 @@ function verifyCronSecret(req: NextRequest): boolean {
   return secret === process.env.CRON_SECRET;
 }
 
-// 每天輪播策略：從所有「新推薦」狀態、今天還未推薦的 prospects 中隨機選 BATCH 筆
-// 不依賴「未來池」，相容 seed 舊資料與歷史日期
-const DAILY_BATCH_SIZE = 25;
+const DAILY_BATCH_SIZE = 10;
 
 export async function POST(req: NextRequest) {
   if (!verifyCronSecret(req)) {
@@ -22,35 +20,31 @@ export async function POST(req: NextRequest) {
     const tomorrow = new Date(today);
     tomorrow.setDate(tomorrow.getDate() + 1);
 
-    // 今天已釋出幾筆
-    const todayCount = await prisma.prospectRecommendation.count({
+    const todayCount = await prisma.partnerProspect.count({
       where: { recommended_date: { gte: today, lt: tomorrow } },
     });
 
     if (todayCount >= DAILY_BATCH_SIZE) {
       return NextResponse.json({
-        message: `Already released ${todayCount} prospects today, skipping`,
+        message: `Already released ${todayCount} partner prospects today, skipping`,
         released: 0,
       });
     }
 
     const needed = DAILY_BATCH_SIZE - todayCount;
 
-    // 候選池：所有 'new' 狀態、且今天尚未出現的 prospects
-    // 優先選最久沒出現的（oldest recommended_date first）
-    const candidates = await prisma.prospectRecommendation.findMany({
+    const candidates = await prisma.partnerProspect.findMany({
       where: {
         status: 'new',
-        recommended_date: { lt: today }, // 排除今天已有的
+        recommended_date: { lt: today },
       },
-      orderBy: { recommended_date: 'asc' }, // 最舊的先輪到
+      orderBy: { recommended_date: 'asc' },
       take: needed,
     });
 
     if (candidates.length === 0) {
-      // 全部非 new 狀態則回報
       return NextResponse.json({
-        message: 'No eligible prospects to release (all marked or already today)',
+        message: 'No eligible partner prospects to release',
         released: 0,
       });
     }
@@ -58,7 +52,7 @@ export async function POST(req: NextRequest) {
     const releaseTime = new Date(today);
     releaseTime.setHours(7, 0, 0, 0);
 
-    await prisma.prospectRecommendation.updateMany({
+    await prisma.partnerProspect.updateMany({
       where: { id: { in: candidates.map((p) => p.id) } },
       data: { recommended_date: releaseTime },
     });
@@ -69,7 +63,7 @@ export async function POST(req: NextRequest) {
       timestamp: new Date().toISOString(),
     });
   } catch (e) {
-    console.error('[cron/release-prospects]', e);
+    console.error('[cron/release-partner-prospects]', e);
     const msg = e instanceof Error ? e.message : String(e);
     return NextResponse.json({ error: 'Internal error', detail: msg }, { status: 500 });
   }

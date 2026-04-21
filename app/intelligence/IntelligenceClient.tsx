@@ -141,6 +141,25 @@ export default function IntelligenceClient({ statuses, incidents, news, partners
   const [activeTab, setActiveTab] = useState<'radar' | 'status' | 'news' | 'partners'>('radar');
   const [vendorFilter, setVendorFilter] = useState('');
   const [categoryFilter, setCategoryFilter] = useState('');
+  const [fetching, setFetching] = useState(false);
+  const [fetchMsg, setFetchMsg] = useState('');
+
+  async function handleFetchNow() {
+    setFetching(true);
+    setFetchMsg('');
+    try {
+      const res = await fetch('/api/intelligence/fetch-now', { method: 'POST' });
+      if (res.ok) {
+        setFetchMsg('✅ 抓取完成，請重新整理頁面查看最新新聞');
+      } else {
+        setFetchMsg('❌ 抓取失敗，請稍後再試');
+      }
+    } catch {
+      setFetchMsg('❌ 網路錯誤');
+    } finally {
+      setFetching(false);
+    }
+  }
 
   const vendors = useMemo(() => Array.from(new Set(news.map((n) => n.vendor))), [news]);
 
@@ -173,7 +192,19 @@ export default function IntelligenceClient({ statuses, incidents, news, partners
   return (
     <div>
       <div className="mb-6">
-        <h1 className="text-2xl font-bold text-white mb-1">🌐 市場情報</h1>
+        <div className="flex items-center justify-between mb-1">
+          <h1 className="text-2xl font-bold text-white">🌐 市場情報</h1>
+          <div className="flex items-center gap-2">
+            {fetchMsg && <span className="text-xs text-gray-400">{fetchMsg}</span>}
+            <button
+              onClick={handleFetchNow}
+              disabled={fetching}
+              className="px-3 py-1.5 rounded-lg bg-blue-600/30 hover:bg-blue-600/50 border border-blue-700/50 text-blue-300 text-xs font-medium transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+            >
+              {fetching ? '⏳ 抓取中...' : '🔄 立即抓取最新新聞'}
+            </button>
+          </div>
+        </div>
         {activeIncidents.length > 0 && (
           <div className="bg-red-950/40 border border-red-800 rounded-lg px-4 py-2 flex items-center gap-3">
             <span className="text-red-400 animate-pulse text-lg">🔴</span>
