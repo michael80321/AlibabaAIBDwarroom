@@ -69,10 +69,24 @@ export default function AdminPage() {
         ? `✅ ${JSON.stringify(data.result)}`
         : `❌ ${data.error}`;
       setStates((s) => ({ ...s, [action]: { loading: false, result: msg } }));
-      // Refresh debug info
       fetch('/api/debug').then((r) => r.json()).then(setDebug);
     } catch (e) {
       setStates((s) => ({ ...s, [action]: { loading: false, result: `❌ ${String(e)}` } }));
+    }
+  }
+
+  async function seedCN() {
+    setStates((s) => ({ ...s, 'seed-cn': { loading: true, result: '' } }));
+    try {
+      const res = await fetch('/api/admin/seed-cn', { method: 'POST' });
+      const data = await res.json();
+      const msg = res.ok
+        ? `✅ 新增 ${data.prospectsInserted} 筆潛在客戶、${data.partnersInserted} 筆合作夥伴（跳過重複 ${data.prospectsSkipped + data.partnersSkipped} 筆）`
+        : `❌ ${data.error}`;
+      setStates((s) => ({ ...s, 'seed-cn': { loading: false, result: msg } }));
+      fetch('/api/debug').then((r) => r.json()).then(setDebug);
+    } catch (e) {
+      setStates((s) => ({ ...s, 'seed-cn': { loading: false, result: `❌ ${String(e)}` } }));
     }
   }
 
@@ -117,6 +131,28 @@ export default function AdminPage() {
           </div>
         </div>
       )}
+
+      {/* CN Data Seeding */}
+      <div className="bg-gray-900 border border-red-800/40 rounded-xl p-4 mb-3 transition-colors hover:bg-red-950/20">
+        <div className="flex items-start justify-between gap-4">
+          <div className="flex-1">
+            <p className="text-white font-medium text-sm">🇨🇳 新增大陸地區推薦資料</p>
+            <p className="text-gray-500 text-xs mt-0.5">
+              插入 15 筆大陸潛在客戶 + 12 筆大陸合作夥伴（已存在的會自動跳過）
+            </p>
+            {states['seed-cn']?.result && (
+              <p className="text-xs mt-2 text-gray-300">{states['seed-cn'].result}</p>
+            )}
+          </div>
+          <button
+            onClick={seedCN}
+            disabled={states['seed-cn']?.loading}
+            className="flex-shrink-0 px-4 py-2 rounded-lg bg-red-700 hover:bg-red-600 text-white text-sm font-medium disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+          >
+            {states['seed-cn']?.loading ? '新增中...' : '新增'}
+          </button>
+        </div>
+      </div>
 
       {/* Actions */}
       <div className="space-y-3">
