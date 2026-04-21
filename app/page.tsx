@@ -3,7 +3,6 @@ import { prisma } from '@/lib/prisma';
 import { format } from 'date-fns';
 import { zhTW } from 'date-fns/locale';
 import WarRoomCommandCard from '@/components/WarRoomCommandCard';
-import CustomerCard from '@/components/CustomerCard';
 import VendorStatusBadge from '@/components/VendorStatusBadge';
 import AlertBanner from '@/components/AlertBanner';
 import Link from 'next/link';
@@ -13,13 +12,13 @@ async function getWarRoomData() {
   const today = new Date();
   today.setHours(0, 0, 0, 0);
 
-  const [strategy, attackNow, statuses, incidents, recentNews, stuckPipeline] =
+  const [strategy, attackNow, statuses, incidents, recentNews, stuckPipeline, pipelineTotal] =
     await Promise.all([
       prisma.dailyStrategy.findUnique({ where: { date: today } }),
       prisma.customer.findMany({
-        where: { priority_label: 'Attack Now' },
+        where: { priority_label: { in: ['Attack Now', 'Nurture'] } },
         orderBy: { priority_score: 'desc' },
-        take: 5,
+        take: 6,
       }),
       prisma.serviceStatus.findMany({
         distinct: ['vendor'],
@@ -32,7 +31,7 @@ async function getWarRoomData() {
       }),
       prisma.cloudVendorNews.findMany({
         orderBy: { published_at: 'desc' },
-        take: 5,
+        take: 4,
       }),
       prisma.pipelineStage.findMany({
         where: {
@@ -40,25 +39,34 @@ async function getWarRoomData() {
           stage: { notIn: ['close', 'lost', 'hold'] },
         },
         include: {
-          customer: { select: { id: true, company_name: true, priority_label: true } },
+          customer: { select: { id: true, company_name: true } },
         },
         orderBy: { entered_at: 'asc' },
         take: 5,
       }),
+      prisma.pipelineStage.count({
+        where: { stage: { notIn: ['close', 'lost'] } },
+      }),
     ]);
 
-  // Get latest status per vendor
   const vendorMap = new Map<string, (typeof statuses)[0]>();
   for (const s of statuses) {
     if (!vendorMap.has(s.vendor)) vendorMap.set(s.vendor, s);
   }
   const latestStatuses = Array.from(vendorMap.values());
 
-  return { strategy, attackNow, latestStatuses, incidents, recentNews, stuckPipeline };
+  return { strategy, attackNow, latestStatuses, incidents, recentNews, stuckPipeline, pipelineTotal };
 }
 
+const CATEGORY_LABEL: Record<string, { label: string; cls: string }> = {
+  incident: { label: '⚡ 異常', cls: 'bg-red-900/50 text-red-300' },
+  promotion: { label: '💰 優惠', cls: 'bg-green-900/50 text-green-300' },
+  product: { label: '🚀 新品', cls: 'bg-blue-900/50 text-blue-300' },
+  news: { label: '📰 新聞', cls: 'bg-gray-800 text-gray-400' },
+};
+
 export default async function WarRoomPage() {
-  const { strategy, attackNow, latestStatuses, incidents, recentNews, stuckPipeline } =
+  const { strategy, attackNow, latestStatuses, incidents, recentNews, stuckPipeline, pipelineTotal } =
     await getWarRoomData();
 
   const top3Actions = (strategy?.top3_actions as Array<{
@@ -77,20 +85,34 @@ export default async function WarRoomPage() {
   }>) || [];
 
   const today = new Date();
+  const attackNowCount = attackNow.filter(c => c.priority_label === 'Attack Now').length;
 
   return (
-    <div>
-      {/* Page Header */}
-      <div className="mb-6">
-        <h1 className="text-2xl font-bold text-white">⚔️ War Room</h1>
-        <p className="text-gray-500 text-sm">
-          {format(today, 'yyyy年MM月dd日 EEEE', { locale: zhTW })}
-        </p>
+    <div className="space-y-4">
+
+      {/* ── Header ── */}
+      <div className="flex items-end justify-between">
+        <div>
+          <h1 className="text-2xl font-bold text-white">⚔️ War Room</h1>
+          <p className="text-gray-500 text-sm mt-0.5">
+            {format(today, 'yyyy年MM月dd日 EEEE', { locale: zhTW })}
+          </p>
+        </div>
+        {/* Quick stats */}
+        <div className="flex items-center gap-3">
+          <Stat label="攻堅客戶" value={attackNowCount} color="text-red-400" />
+          <div className="w-px h-8 bg-gray-800" />
+          <Stat label="Pipeline" value={pipelineTotal} color="text-blue-400" />
+          <div className="w-px h-8 bg-gray-800" />
+          <Stat label="卡關中" value={stuckPipeline.length} color={stuckPipeline.length > 0 ? 'text-yellow-400' : 'text-gray-600'} />
+          <div className="w-px h-8 bg-gray-800" />
+          <Stat label="競品異常" value={incidents.length} color={incidents.length > 0 ? 'text-orange-400' : 'text-gray-600'} />
+        </div>
       </div>
 
-      {/* Action Alert Banner */}
+      {/* ── Incident Alerts ── */}
       {incidents.length > 0 && (
-        <div className="mb-4 space-y-2">
+        <div className="space-y-2">
           {incidents.map((incident) => (
             <AlertBanner
               key={incident.id}
@@ -102,188 +124,207 @@ export default async function WarRoomPage() {
         </div>
       )}
 
-      {/* Three Column Layout */}
+      {/* ── Main 2-col layout ── */}
       <div className="grid grid-cols-12 gap-4">
-        {/* Left Column: Today's Battle Orders (40%) */}
-        <div className="col-span-5">
-          <div className="bg-gray-900 border border-gray-800 rounded-xl p-4">
-            <div className="flex items-center justify-between mb-4">
-              <div>
-                <h2 className="text-white font-bold text-lg">今日作戰指令</h2>
-                {strategy && (
-                  <div className="flex items-center gap-1 mt-1">
-                    <span className="text-xs px-1.5 py-0.5 rounded bg-purple-900/50 text-purple-300">✦ AI</span>
-                    <span className="text-gray-600 text-xs">
-                      {format(strategy.generated_at, 'HH:mm', { locale: zhTW })} 生成
-                    </span>
-                  </div>
-                )}
-              </div>
-              <Link
-                href="/strategy"
-                className="text-xs text-gray-500 hover:text-gray-300 transition-colors"
-              >
-                完整策略 →
-              </Link>
-            </div>
 
-            {top3Actions.length > 0 ? (
-              <div className="space-y-3">
-                {top3Actions.map((action) => {
-                  const customer = attackNow.find((c) => c.id === action.customer_id);
+        {/* Left 55%: 今日作戰指令 */}
+        <div className="col-span-7 space-y-3">
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-2">
+              <h2 className="text-white font-bold text-base">今日作戰指令</h2>
+              {strategy && (
+                <span className="text-xs px-1.5 py-0.5 rounded bg-purple-900/50 text-purple-300">
+                  ✦ AI · {format(strategy.generated_at, 'HH:mm')} 生成
+                </span>
+              )}
+            </div>
+            <Link href="/strategy" className="text-xs text-gray-500 hover:text-gray-300">
+              完整策略 →
+            </Link>
+          </div>
+
+          {top3Actions.length > 0 ? (
+            <div className="space-y-3">
+              {top3Actions.map((action) => (
+                <WarRoomCommandCard key={action.priority} action={action} />
+              ))}
+            </div>
+          ) : (
+            <div className="bg-gray-900 border border-gray-800 rounded-xl p-8 text-center">
+              <p className="text-gray-500 text-sm mb-1">今日策略尚未生成</p>
+              <p className="text-gray-700 text-xs mb-4">每天 06:30 自動生成，或手動觸發</p>
+              <GenerateStrategyButton />
+            </div>
+          )}
+
+          {/* Abandon list */}
+          {abandonList.length > 0 && (
+            <div className="bg-gray-900/50 border border-gray-800 rounded-xl px-4 py-3">
+              <p className="text-gray-500 text-xs font-semibold mb-2">⛔ 今天不要浪費時間</p>
+              <div className="flex flex-wrap gap-x-4 gap-y-1">
+                {abandonList.map((item, i) => (
+                  <span key={i} className="text-xs text-gray-600">
+                    <span className="text-gray-500">{item.customer_name}</span>
+                    <span className="text-gray-700 mx-1">—</span>
+                    {item.reason}
+                  </span>
+                ))}
+              </div>
+            </div>
+          )}
+        </div>
+
+        {/* Right 45%: Signals */}
+        <div className="col-span-5 space-y-3">
+
+          {/* 雲廠商狀態 - compact 2-col grid */}
+          <div className="bg-gray-900 border border-gray-800 rounded-xl p-4">
+            <div className="flex items-center justify-between mb-3">
+              <h3 className="text-white font-bold text-sm">雲廠商狀態</h3>
+              <Link href="/intelligence" className="text-xs text-gray-600 hover:text-gray-400">查看全部 →</Link>
+            </div>
+            {latestStatuses.length > 0 ? (
+              <div className="grid grid-cols-2 gap-x-3 gap-y-0.5">
+                {latestStatuses.map((status) => (
+                  <VendorStatusBadge
+                    key={status.id}
+                    vendor={status.vendor}
+                    status={status.status}
+                    checkedAt={status.checked_at}
+                  />
+                ))}
+              </div>
+            ) : (
+              <p className="text-gray-600 text-xs">尚未抓取狀態</p>
+            )}
+          </div>
+
+          {/* Pipeline 卡關 */}
+          {stuckPipeline.length > 0 && (
+            <div className="bg-yellow-950/20 border border-yellow-800/40 rounded-xl p-4">
+              <div className="flex items-center justify-between mb-2">
+                <h3 className="text-yellow-400 font-bold text-sm">⚠ Pipeline 卡關</h3>
+                <Link href="/pipeline" className="text-xs text-yellow-600 hover:text-yellow-400">處理 →</Link>
+              </div>
+              <div className="space-y-1.5">
+                {stuckPipeline.map((item) => {
+                  const days = Math.floor((Date.now() - new Date(item.entered_at).getTime()) / (1000 * 60 * 60 * 24));
                   return (
-                    <WarRoomCommandCard
-                      key={action.priority}
-                      action={action}
-                      priorityLabel={customer?.priority_label || 'Attack Now'}
-                    />
+                    <div key={item.id} className="flex items-center justify-between">
+                      <Link href={`/customers/${item.customer.id}`} className="text-sm text-gray-300 hover:text-white">
+                        {item.customer.company_name}
+                      </Link>
+                      <span className={`text-xs font-bold tabular-nums ${days > 30 ? 'text-red-400' : 'text-yellow-400'}`}>
+                        {days}d
+                      </span>
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+          )}
+
+          {/* 最新市場情報 */}
+          <div className="bg-gray-900 border border-gray-800 rounded-xl p-4">
+            <div className="flex items-center justify-between mb-3">
+              <h3 className="text-white font-bold text-sm">最新情報</h3>
+              <Link href="/intelligence" className="text-xs text-blue-400 hover:text-blue-300">全部 →</Link>
+            </div>
+            {recentNews.length > 0 ? (
+              <div className="space-y-2.5">
+                {recentNews.map((news) => {
+                  const cat = CATEGORY_LABEL[news.category] || CATEGORY_LABEL.news;
+                  return (
+                    <div key={news.id} className="flex gap-2 items-start">
+                      <span className={`flex-shrink-0 text-[10px] px-1.5 py-0.5 rounded mt-0.5 ${cat.cls}`}>
+                        {cat.label}
+                      </span>
+                      <div className="min-w-0">
+                        <p className="text-gray-300 text-xs leading-snug line-clamp-2">{news.title}</p>
+                        <p className="text-gray-600 text-[10px] mt-0.5">{news.vendor}</p>
+                      </div>
+                    </div>
                   );
                 })}
               </div>
             ) : (
-              <div className="text-center py-8">
-                <p className="text-gray-600 text-sm">今日策略尚未生成</p>
-                <GenerateStrategyButton />
-              </div>
-            )}
-
-            {/* Abandon List */}
-            {abandonList.length > 0 && (
-              <div className="mt-4 pt-4 border-t border-gray-800">
-                <p className="text-gray-500 text-xs font-semibold mb-2">今天不要浪費時間的客戶</p>
-                <div className="space-y-1">
-                  {abandonList.map((item, i) => (
-                    <div key={i} className="flex items-center gap-2 text-xs text-gray-600">
-                      <span>✕</span>
-                      <span className="text-gray-500">{item.customer_name}</span>
-                      <span className="text-gray-700">—</span>
-                      <span className="text-gray-600">{item.reason}</span>
-                    </div>
-                  ))}
-                </div>
-              </div>
+              <p className="text-gray-600 text-xs">尚無新聞，開啟市場情報頁面自動抓取</p>
             )}
           </div>
-        </div>
-
-        {/* Center Column: Hot Prospects (35%) */}
-        <div className="col-span-4">
-          <div className="bg-gray-900 border border-gray-800 rounded-xl p-4">
-            <div className="flex items-center justify-between mb-4">
-              <h2 className="text-white font-bold text-lg">🎯 攻堅名單</h2>
-              <Link
-                href="/prospects"
-                className="text-xs text-blue-400 hover:text-blue-300 px-3 py-1 rounded-lg border border-blue-800 hover:border-blue-600 transition-colors"
-              >
-                + 新增客戶
-              </Link>
-            </div>
-
-            {/* Today's highlight */}
-            <div className="bg-amber-950/30 border border-amber-800/50 rounded-lg p-3 mb-3">
-              <p className="text-amber-400 text-xs font-semibold mb-1">今日重點</p>
-              <p className="text-amber-200 text-xs">
-                {top3Actions[0]
-                  ? `優先聯絡 ${top3Actions[0].customer_name}，${top3Actions[0].reason}`
-                  : '策略生成中...'}
-              </p>
-            </div>
-
-            <div className="space-y-3">
-              {attackNow.map((customer) => (
-                <CustomerCard key={customer.id} customer={customer} />
-              ))}
-            </div>
-
-            {attackNow.length === 0 && (
-              <p className="text-gray-600 text-sm text-center py-6">
-                沒有 Attack Now 客戶
-              </p>
-            )}
-          </div>
-        </div>
-
-        {/* Right Column: Signals & Alerts (25%) */}
-        <div className="col-span-3 space-y-4">
-          {/* Vendor Status */}
-          <div className="bg-gray-900 border border-gray-800 rounded-xl p-4">
-            <h3 className="text-white font-bold text-sm mb-3">雲廠商狀態</h3>
-            <div className="space-y-0.5">
-              {latestStatuses.map((status) => (
-                <VendorStatusBadge
-                  key={status.id}
-                  vendor={status.vendor}
-                  status={status.status}
-                  checkedAt={status.checked_at}
-                />
-              ))}
-            </div>
-          </div>
-
-          {/* Recent News */}
-          <div className="bg-gray-900 border border-gray-800 rounded-xl p-4">
-            <h3 className="text-white font-bold text-sm mb-3">市場情報</h3>
-            <div className="space-y-2">
-              {recentNews.map((news) => (
-                <div key={news.id} className="border-b border-gray-800 pb-2 last:border-0 last:pb-0">
-                  <div className="flex items-center gap-1 mb-0.5">
-                    <span className="text-xs px-1.5 py-0.5 rounded bg-gray-800 text-gray-400">
-                      {news.vendor}
-                    </span>
-                    <span className={`text-xs px-1.5 py-0.5 rounded ${
-                      news.category === 'incident'
-                        ? 'bg-red-900/50 text-red-300'
-                        : news.category === 'promotion'
-                        ? 'bg-green-900/50 text-green-300'
-                        : 'bg-blue-900/50 text-blue-300'
-                    }`}>
-                      {news.category}
-                    </span>
-                  </div>
-                  <p className="text-gray-300 text-xs line-clamp-2">{news.title}</p>
-                </div>
-              ))}
-            </div>
-            <Link
-              href="/intelligence"
-              className="block text-center text-xs text-blue-400 hover:text-blue-300 mt-3"
-            >
-              查看全部情報 →
-            </Link>
-          </div>
-
-          {/* Stuck Pipeline */}
-          {stuckPipeline.length > 0 && (
-            <div className="bg-yellow-950/20 border border-yellow-800/50 rounded-xl p-4">
-              <h3 className="text-yellow-400 font-bold text-sm mb-3">⚠ Pipeline 卡關</h3>
-              <div className="space-y-2">
-                {stuckPipeline.map((item) => {
-                  const days = Math.floor(
-                    (Date.now() - new Date(item.entered_at).getTime()) / (1000 * 60 * 60 * 24)
-                  );
-                  return (
-                    <div key={item.id} className="flex items-center justify-between text-xs">
-                      <Link
-                        href={`/customers/${item.customer.id}`}
-                        className="text-gray-300 hover:text-white"
-                      >
-                        {item.customer.company_name}
-                      </Link>
-                      <span className="text-yellow-400">{days}天</span>
-                    </div>
-                  );
-                })}
-              </div>
-              <Link
-                href="/pipeline"
-                className="block text-center text-xs text-yellow-400 hover:text-yellow-300 mt-3"
-              >
-                查看 Pipeline →
-              </Link>
-            </div>
-          )}
         </div>
       </div>
+
+      {/* ── Bottom: 攻堅名單 horizontal strip ── */}
+      <div>
+        <div className="flex items-center justify-between mb-3">
+          <h2 className="text-white font-bold text-base">🎯 攻堅名單</h2>
+          <Link
+            href="/customers/new"
+            className="text-xs text-blue-400 hover:text-blue-300 px-3 py-1 rounded-lg border border-blue-800/50 hover:border-blue-600 transition-colors"
+          >
+            + 新增客戶
+          </Link>
+        </div>
+        {attackNow.length > 0 ? (
+          <div className="grid grid-cols-3 gap-3">
+            {attackNow.map((customer) => (
+              <Link
+                key={customer.id}
+                href={`/customers/${customer.id}`}
+                className="bg-gray-900 border border-gray-800 hover:border-gray-600 rounded-xl p-3 transition-colors group"
+              >
+                <div className="flex items-start justify-between mb-1.5">
+                  <p className="text-white font-bold text-sm group-hover:text-blue-300 transition-colors">
+                    {customer.company_name}
+                  </p>
+                  <span className={`flex-shrink-0 text-[10px] px-1.5 py-0.5 rounded ml-2 font-medium ${
+                    customer.priority_label === 'Attack Now'
+                      ? 'bg-red-900/50 text-red-300'
+                      : 'bg-blue-900/50 text-blue-300'
+                  }`}>
+                    {customer.priority_label === 'Attack Now' ? '攻堅' : '培養'}
+                  </span>
+                </div>
+                <p className="text-gray-500 text-xs mb-1.5">{customer.industry}</p>
+                {customer.why_now && (
+                  <p className="text-gray-400 text-xs line-clamp-2 mb-2">{customer.why_now}</p>
+                )}
+                <div className="flex items-center justify-between">
+                  <div className="flex gap-1">
+                    {customer.entry_points.slice(0, 2).map((ep) => (
+                      <span key={ep} className="text-[10px] px-1.5 py-0.5 rounded bg-gray-800 text-gray-500">
+                        {ep}
+                      </span>
+                    ))}
+                  </div>
+                  <span className="text-xs text-gray-600">
+                    {customer.estimated_arr
+                      ? `$${(customer.estimated_arr / 1000).toFixed(0)}K`
+                      : `分數 ${customer.priority_score}`}
+                  </span>
+                </div>
+              </Link>
+            ))}
+          </div>
+        ) : (
+          <div className="bg-gray-900 border border-gray-800 rounded-xl p-6 text-center">
+            <p className="text-gray-600 text-sm mb-2">尚無攻堅客戶</p>
+            <Link href="/customers/new" className="text-xs text-blue-400 hover:text-blue-300">
+              + 新增第一個客戶
+            </Link>
+          </div>
+        )}
+      </div>
+
+    </div>
+  );
+}
+
+function Stat({ label, value, color }: { label: string; value: number; color: string }) {
+  return (
+    <div className="text-right">
+      <p className={`text-xl font-bold tabular-nums ${color}`}>{value}</p>
+      <p className="text-gray-600 text-xs">{label}</p>
     </div>
   );
 }
