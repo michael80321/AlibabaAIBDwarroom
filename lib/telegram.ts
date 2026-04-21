@@ -104,6 +104,32 @@ ${actionLines}
   await sendMessage(text);
 }
 
+export async function sendWeeklyBriefing(
+  weeklyFocus: string,
+  monthlyDirection: string,
+  top3: Array<{ priority: number; customer_name: string; action: string }>
+): Promise<void> {
+  const dateStr = format(new Date(), 'yyyy年MM月dd日', { locale: zhTW });
+  const actionLines = top3
+    .map((a) => `${a.priority}. <b>${a.customer_name}</b> — ${a.action}`)
+    .join('\n');
+
+  const text = `📅 <b>本週 BD 作戰計畫 ${dateStr}</b>
+
+🎯 <b>本週攻堅重點</b>
+${weeklyFocus}
+
+🗓 <b>本月方向</b>
+${monthlyDirection}
+
+⚡ <b>本週 Top 3 行動</b>
+${actionLines}
+
+👉 ${WAR_ROOM_URL}`;
+
+  await sendMessage(text);
+}
+
 export async function sendCustomAlert(message: string): Promise<void> {
   await sendMessage(message);
 }

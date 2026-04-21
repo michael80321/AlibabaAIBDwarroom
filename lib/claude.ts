@@ -1,5 +1,5 @@
 import Anthropic from '@anthropic-ai/sdk';
-import type { Customer, PipelineStage, CloudVendorNews, StatusIncident } from '@prisma/client';
+import type { Customer, PipelineStage, CloudVendorNews, StatusIncident, DailyStrategy } from '@prisma/client';
 
 const client = new Anthropic({
   apiKey: process.env.ANTHROPIC_API_KEY,
@@ -15,6 +15,20 @@ export interface MeetingAnalysis {
   budget_timeline: string;
   next_steps: Array<{ action: string; owner: string; deadline: string }>;
   updated_pitch: string;
+}
+
+export interface WeeklyStrategyResult {
+  weekly_focus: string;
+  monthly_direction: string;
+  top3_actions: Array<{
+    priority: number;
+    customer_name: string;
+    customer_id: string;
+    action: string;
+    reason: string;
+    opening_pitch: string;
+  }>;
+  abandon_list: Array<{ customer_name: string; customer_id: string; reason: string }>;
 }
 
 export interface DailyStrategyResult {
@@ -192,6 +206,97 @@ export async function generateWhyNow(
     return content.text.trim();
   } catch (error) {
     console.error('generateWhyNow error:', error);
+    return null;
+  }
+}
+
+export async function generateWeeklyStrategy(context: {
+  allCustomers: Customer[];
+  pipelineItems: (PipelineStage & { customer: Customer })[];
+  weekNews: CloudVendorNews[];
+  pastStrategies: DailyStrategy[];
+}): Promise<WeeklyStrategyResult | null> {
+  try {
+    const contextStr = JSON.stringify({
+      allCustomers: context.allCustomers.map((c) => ({
+        id: c.id,
+        company_name: c.company_name,
+        priority_label: c.priority_label,
+        priority_score: c.priority_score,
+        industry: c.industry,
+        entry_points: c.entry_points,
+        estimated_arr: c.estimated_arr,
+        why_now: c.why_now,
+        last_contacted: c.last_contacted,
+      })),
+      pipeline: context.pipelineItems.map((p) => ({
+        customer_name: p.customer.company_name,
+        customer_id: p.customer_id,
+        stage: p.stage,
+        deal_value: p.deal_value,
+        expected_close: p.expected_close,
+        blockers: p.blockers,
+        risk_level: p.risk_level,
+        days_in_stage: Math.floor((Date.now() - p.entered_at.getTime()) / (1000 * 60 * 60 * 24)),
+      })),
+      weekNews: context.weekNews.slice(0, 10).map((n) => ({
+        vendor: n.vendor,
+        title: n.title,
+        category: n.category,
+      })),
+      pastActions: context.pastStrategies.slice(0, 5).flatMap((s) => {
+        const actions = s.top3_actions as Array<{ customer_name: string; action: string }>;
+        return actions.map((a) => `${a.customer_name}: ${a.action}`);
+      }),
+    });
+
+    const message = await client.messages.create({
+      model: MODEL,
+      max_tokens: 2500,
+      messages: [
+        {
+          role: 'user',
+          content: `你是 Alibaba Cloud 台灣 BD 作戰室的 AI 策略顧問。今天是 ${new Date().toLocaleDateString('zh-TW')}（週一，本週策略規劃日）。
+
+根據以下資料，生成本週與本月的 BD 策略規劃：
+
+${contextStr}
+
+請輸出 JSON（全部用繁體中文，只輸出 JSON，不要有其他文字）：
+{
+  "weekly_focus": "本週最重要的攻堅重點（2-3句，包含具體客戶名稱和理由）",
+  "monthly_direction": "本月整體方向（3-4句，從 pipeline 健康度、ARR 目標、市場機會三個角度）",
+  "top3_actions": [
+    {
+      "priority": 1,
+      "customer_name": "公司名",
+      "customer_id": "id",
+      "action": "本週必做的具體行動（20字內）",
+      "reason": "為什麼這週是關鍵時機",
+      "opening_pitch": "建議開場白（2句話內）"
+    }
+  ],
+  "abandon_list": [
+    {"customer_name": "公司名", "customer_id": "id", "reason": "為何本週應放棄/暫緩"}
+  ]
+}
+
+判斷邏輯：
+- weekly_focus 應聚焦在本週可關閉或推進的案件
+- monthly_direction 要有數字感（預估 ARR、案件數量、Win Rate）
+- Top 3 優先選 Attack Now + 有近期 expected_close 的
+- abandon_list 放本週不值得投入時間的客戶`,
+        },
+      ],
+    });
+
+    const content = message.content[0];
+    if (content.type !== 'text') return null;
+
+    const jsonText = content.text.trim().replace(/^```json\n?/, '').replace(/\n?```$/, '');
+    return JSON.parse(jsonText) as WeeklyStrategyResult;
+  } catch (error) {
+    console.error('generateWeeklyStrategy error:', error);
     return null;
   }
 }

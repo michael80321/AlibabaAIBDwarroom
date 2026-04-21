@@ -75,7 +75,6 @@ railway variables set CRON_SECRET=$(openssl rand -hex 32)
 railway up
 
 # 6. 取得部署 URL 後設定（從 Railway Dashboard 複製）
-railway variables set APP_URL=https://your-app.railway.app
 railway variables set WAR_ROOM_URL=https://your-app.railway.app
 
 # 7. 選填：Telegram 通知
@@ -91,7 +90,7 @@ railway up
 
 ### 重要注意事項
 
-- **APP_URL** 必須設定才能讓 Cron Job 正常運作（Railway 用這個變數打 API）
+- **WAR_ROOM_URL** 必須設定才能讓 Cron Job 正常運作（Railway 用這個變數打 API）
 - **Seed 只需執行一次**，之後 Cron Job 會自動補充每日推薦名單
 - Railway 免費方案的 Cron 功能需要升級到 Hobby 方案
 - PostgreSQL 資料庫連線字串 (`DATABASE_URL`) 由 Railway 自動注入，不需手動設定
