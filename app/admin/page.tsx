@@ -81,7 +81,7 @@ export default function AdminPage() {
       const res = await fetch('/api/admin/seed-cn', { method: 'POST' });
       const data = await res.json();
       const msg = res.ok
-        ? `✅ 新增 ${data.prospectsInserted} 筆潛在客戶、${data.partnersInserted} 筆合作夥伴（跳過重複 ${data.prospectsSkipped + data.partnersSkipped} 筆）`
+        ? `✅ 新增 ${data.prospectsInserted} 筆、更新 ${data.prospectsUpdated} 筆潛在客戶；新增 ${data.partnersInserted} 筆、更新 ${data.partnersUpdated} 筆合作夥伴 → 今日可見`
         : `❌ ${data.error}`;
       setStates((s) => ({ ...s, 'seed-cn': { loading: false, result: msg } }));
       fetch('/api/debug').then((r) => r.json()).then(setDebug);

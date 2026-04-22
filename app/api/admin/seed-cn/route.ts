@@ -6,50 +6,66 @@ import { partnerProspectDataCN } from '@/prisma/partner-prospect-data-cn';
 
 export async function POST() {
   try {
-    const releaseDate = new Date();
-    releaseDate.setDate(releaseDate.getDate() - 1);
-    releaseDate.setHours(7, 0, 0, 0);
+    const today = new Date();
+    today.setHours(7, 0, 0, 0);
 
-    // Get existing names to avoid duplicates
+    const cnProspectNames = prospectDataCN.map((p) => p.company_name);
+    const cnPartnerNames = partnerProspectDataCN.map((p) => p.name);
+
+    // Find which ones already exist
     const existingProspects = await prisma.prospectRecommendation.findMany({
-      where: { company_name: { in: prospectDataCN.map((p) => p.company_name) } },
-      select: { company_name: true },
+      where: { company_name: { in: cnProspectNames } },
+      select: { id: true, company_name: true },
     });
     const existingProspectNames = new Set(existingProspects.map((p) => p.company_name));
 
-    const newProspects = prospectDataCN
-      .filter((p) => !existingProspectNames.has(p.company_name))
-      .map((p) => ({ ...p, recommended_date: releaseDate }));
-
+    // Insert new ones with today's date
+    const newProspects = prospectDataCN.filter((p) => !existingProspectNames.has(p.company_name));
     let prospectsInserted = 0;
     for (const p of newProspects) {
-      await prisma.prospectRecommendation.create({ data: p });
+      await prisma.prospectRecommendation.create({ data: { ...p, recommended_date: today } });
       prospectsInserted++;
+    }
+
+    // Update existing ones to today's date so they appear in 今日 filter
+    let prospectsUpdated = 0;
+    if (existingProspects.length > 0) {
+      await prisma.prospectRecommendation.updateMany({
+        where: { id: { in: existingProspects.map((p) => p.id) } },
+        data: { recommended_date: today },
+      });
+      prospectsUpdated = existingProspects.length;
     }
 
     // Partner prospects
     const existingPartners = await prisma.partnerProspect.findMany({
-      where: { name: { in: partnerProspectDataCN.map((p) => p.name) } },
-      select: { name: true },
+      where: { name: { in: cnPartnerNames } },
+      select: { id: true, name: true },
     });
     const existingPartnerNames = new Set(existingPartners.map((p) => p.name));
 
-    const newPartners = partnerProspectDataCN
-      .filter((p) => !existingPartnerNames.has(p.name))
-      .map((p) => ({ ...p, recommended_date: releaseDate }));
-
+    const newPartners = partnerProspectDataCN.filter((p) => !existingPartnerNames.has(p.name));
     let partnersInserted = 0;
     for (const p of newPartners) {
-      await prisma.partnerProspect.create({ data: p });
+      await prisma.partnerProspect.create({ data: { ...p, recommended_date: today } });
       partnersInserted++;
+    }
+
+    let partnersUpdated = 0;
+    if (existingPartners.length > 0) {
+      await prisma.partnerProspect.updateMany({
+        where: { id: { in: existingPartners.map((p) => p.id) } },
+        data: { recommended_date: today },
+      });
+      partnersUpdated = existingPartners.length;
     }
 
     return NextResponse.json({
       ok: true,
       prospectsInserted,
-      prospectsSkipped: prospectDataCN.length - prospectsInserted,
+      prospectsUpdated,
       partnersInserted,
-      partnersSkipped: partnerProspectDataCN.length - partnersInserted,
+      partnersUpdated,
     });
   } catch (e) {
     const msg = e instanceof Error ? e.message : String(e);
