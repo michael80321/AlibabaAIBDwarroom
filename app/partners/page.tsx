@@ -2,7 +2,7 @@ export const dynamic = 'force-dynamic';
 import { prisma } from '@/lib/prisma';
 import PartnersClient from './PartnersClient';
 
-const DAILY_BATCH = 10;
+const DAILY_BATCH = 500;
 
 async function autoReleaseTodayIfNeeded(today: Date, tomorrow: Date) {
   const todayCount = await prisma.partnerProspect.count({
@@ -10,11 +10,10 @@ async function autoReleaseTodayIfNeeded(today: Date, tomorrow: Date) {
   });
   if (todayCount >= DAILY_BATCH) return todayCount;
 
-  const needed = DAILY_BATCH - todayCount;
+  // Release ALL pending records at once
   const candidates = await prisma.partnerProspect.findMany({
     where: { status: 'new', recommended_date: { lt: today } },
     orderBy: { recommended_date: 'asc' },
-    take: needed,
   });
   if (candidates.length > 0) {
     const releaseTime = new Date(today);
