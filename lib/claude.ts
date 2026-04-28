@@ -422,3 +422,223 @@ export async function generateOutreachEmail(
     return null;
   }
 }
+
+export interface FollowUpResult {
+  subject_zh: string;
+  body_zh: string;
+  subject_en: string;
+  body_en: string;
+  urgency: 'high' | 'medium' | 'low';
+  reason: string;
+}
+
+export async function generateFollowUp(
+  customer: {
+    company_name: string;
+    industry: string | null;
+    current_cloud: string | null;
+    why_now: string | null;
+    opening_pitch: string | null;
+    pain_points: string[];
+  },
+  contact: { name?: string; title?: string; email?: string },
+  daysSinceContact: number,
+  lastContext?: string
+): Promise<FollowUpResult | null> {
+  try {
+    const prompt = `你是 Alibaba Cloud 台灣的資深 BD。
+
+客戶：${customer.company_name}（${customer.industry || '未知產業'}）
+使用雲：${customer.current_cloud || '未知'}
+上次聯繫：${daysSinceContact} 天前
+上次對話背景：${lastContext || '無記錄'}
+聯絡人：${contact.name || '未知'}${contact.title ? `，${contact.title}` : ''}
+痛點：${customer.pain_points.join('、') || '未知'}
+時機：${customer.why_now || '未知'}
+
+寫一封自然不做作的跟進信（不超過 80 字中文 / 60 words 英文）：
+- 不要說「不知道您是否有時間」這種弱話
+- 用一個新訊息或新角度切入（競品動態、新功能、市場變化）
+- 結尾是具體的下一步邀約
+
+輸出 JSON（只輸出 JSON）：
+{
+  "subject_zh": "主旨",
+  "body_zh": "信件內文",
+  "subject_en": "Subject",
+  "body_en": "Email body",
+  "urgency": "high|medium|low",
+  "reason": "為什麼現在跟進（1句話，內部備註用）"
+}`;
+
+    const message = await client.messages.create({
+      model: MODEL,
+      max_tokens: 1000,
+      messages: [{ role: 'user', content: prompt }],
+    });
+
+    const content = message.content[0];
+    if (content.type !== 'text') return null;
+    const jsonText = content.text.trim().replace(/^```json\n?/, '').replace(/\n?```$/, '');
+    return JSON.parse(jsonText) as FollowUpResult;
+  } catch (error) {
+    console.error('generateFollowUp error:', error);
+    return null;
+  }
+}
+
+export interface CloudArchitectureResult {
+  title: string;
+  summary: string;
+  products: Array<{
+    name: string;
+    purpose: string;
+    spec: string;
+    monthly_usd: number;
+  }>;
+  total_monthly_usd: number;
+  vs_aws_saving_pct: number;
+  architecture_diagram: string;
+  key_advantages: string[];
+  migration_timeline: string;
+}
+
+export async function generateCloudArchitecture(
+  customer: {
+    company_name: string;
+    industry: string | null;
+    current_cloud: string | null;
+    pain_points: string[];
+    entry_points: string[];
+    tech_stack: string[];
+    estimated_arr: number | null;
+  },
+  requirements?: string
+): Promise<CloudArchitectureResult | null> {
+  try {
+    const prompt = `你是 Alibaba Cloud 台灣的解決方案架構師（SA），擅長為客戶設計雲端方案並與 AWS/GCP 對比。
+
+客戶資料：
+- 公司：${customer.company_name}
+- 產業：${customer.industry || '未知'}
+- 目前使用：${customer.current_cloud || '未知'}
+- 痛點：${customer.pain_points.join('、') || '未知'}
+- 切入點：${customer.entry_points.join('、') || '未知'}
+- 技術棧：${customer.tech_stack.join('、') || '未知'}
+- 預估 ARR：$${customer.estimated_arr ? (customer.estimated_arr / 1000).toFixed(0) + 'K' : '未知'}
+${requirements ? `\n特殊需求：${requirements}` : ''}
+
+請設計一份 Alibaba Cloud 解決方案提案，包含：
+1. 推薦的 Alibaba Cloud 產品組合（2-5個核心產品）
+2. 每個產品的規格和月費估算（USD）
+3. 與現有 AWS/GCP 相比的節省比例
+4. 文字版架構說明（描述各組件如何連接）
+5. 核心競爭優勢（3-4點，針對此客戶）
+6. 遷移時間線估計
+
+輸出 JSON（只輸出 JSON，月費用 USD 估算要合理）：
+{
+  "title": "方案標題",
+  "summary": "2-3句方案摘要",
+  "products": [
+    {
+      "name": "ECS c6.2xlarge",
+      "purpose": "Web 應用伺服器",
+      "spec": "8 vCPU / 16GB RAM x2",
+      "monthly_usd": 180
+    }
+  ],
+  "total_monthly_usd": 500,
+  "vs_aws_saving_pct": 25,
+  "architecture_diagram": "Client → SLB → ECS (x2) → RDS MySQL → OSS (靜態資源)\n說明文字...",
+  "key_advantages": ["優勢1", "優勢2", "優勢3"],
+  "migration_timeline": "第1週：評估與規劃；第2-3週：資料遷移；第4週：切流量"
+}`;
+
+    const message = await client.messages.create({
+      model: MODEL,
+      max_tokens: 2000,
+      messages: [{ role: 'user', content: prompt }],
+    });
+
+    const content = message.content[0];
+    if (content.type !== 'text') return null;
+    const jsonText = content.text.trim().replace(/^```json\n?/, '').replace(/\n?```$/, '');
+    return JSON.parse(jsonText) as CloudArchitectureResult;
+  } catch (error) {
+    console.error('generateCloudArchitecture error:', error);
+    return null;
+  }
+}
+
+export interface PricingResult {
+  customer_name: string;
+  use_case: string;
+  alibaba: { items: Array<{ item: string; monthly_usd: number }>; total: number };
+  aws: { items: Array<{ item: string; monthly_usd: number }>; total: number };
+  gcp: { items: Array<{ item: string; monthly_usd: number }>; total: number };
+  alibaba_saving_vs_aws_pct: number;
+  alibaba_saving_vs_gcp_pct: number;
+  annual_saving_usd: number;
+  roi_pitch: string;
+}
+
+export async function generatePricingComparison(
+  customer: {
+    company_name: string;
+    industry: string | null;
+    current_cloud: string | null;
+    estimated_arr: number | null;
+    entry_points: string[];
+  },
+  requirements?: string
+): Promise<PricingResult | null> {
+  try {
+    const prompt = `你是 Alibaba Cloud 的定價專家，熟悉 Alibaba Cloud、AWS、GCP 各項服務的定價。
+
+客戶：${customer.company_name}（${customer.industry || '未知'}）
+目前使用：${customer.current_cloud || '未知'}
+切入點：${customer.entry_points.join('、')}
+預估月費規模：~$${customer.estimated_arr ? Math.round(customer.estimated_arr / 12 / 1000) + 'K' : '未知'}/月
+${requirements ? `需求說明：${requirements}` : ''}
+
+請根據此客戶最可能的用量，產出三雲費用對比表。
+重點：Alibaba Cloud 在 CDN、OSS、ECS 亞太區通常有 20-35% 價格優勢。
+
+輸出 JSON（只輸出 JSON，數字要合理）：
+{
+  "customer_name": "${customer.company_name}",
+  "use_case": "用途描述（1句話）",
+  "alibaba": {
+    "items": [{"item": "ECS 計算", "monthly_usd": 200}],
+    "total": 500
+  },
+  "aws": {
+    "items": [{"item": "EC2 計算", "monthly_usd": 280}],
+    "total": 680
+  },
+  "gcp": {
+    "items": [{"item": "GCE 計算", "monthly_usd": 260}],
+    "total": 640
+  },
+  "alibaba_saving_vs_aws_pct": 26,
+  "alibaba_saving_vs_gcp_pct": 22,
+  "annual_saving_usd": 2160,
+  "roi_pitch": "一句話 ROI 說法，直接可以跟客戶說的"
+}`;
+
+    const message = await client.messages.create({
+      model: MODEL,
+      max_tokens: 1500,
+      messages: [{ role: 'user', content: prompt }],
+    });
+
+    const content = message.content[0];
+    if (content.type !== 'text') return null;
+    const jsonText = content.text.trim().replace(/^```json\n?/, '').replace(/\n?```$/, '');
+    return JSON.parse(jsonText) as PricingResult;
+  } catch (error) {
+    console.error('generatePricingComparison error:', error);
+    return null;
+  }
+}

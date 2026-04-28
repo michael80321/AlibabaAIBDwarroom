@@ -75,7 +75,10 @@ export async function sendResolvedAlert(
   await sendMessage(text);
 }
 
-export async function sendDailyBriefing(strategy: DailyStrategy): Promise<void> {
+export async function sendDailyBriefing(
+  strategy: DailyStrategy,
+  agentSummary?: { pendingInterventions: number; pendingOutreach: number; runsToday: number }
+): Promise<void> {
   const dateStr = format(strategy.date, 'yyyy年MM月dd日', { locale: zhTW });
   const actions = strategy.top3_actions as Array<{
     priority: number;
@@ -91,11 +94,16 @@ export async function sendDailyBriefing(strategy: DailyStrategy): Promise<void> 
     )
     .join('\n\n');
 
+  const agentLines = agentSummary
+    ? `\n🤖 <b>AI 員工動態</b>\n• 待審批介入：${agentSummary.pendingInterventions} 件\n• 待審核開發信：${agentSummary.pendingOutreach} 封\n• 今日任務執行：${agentSummary.runsToday} 次\n👉 ${WAR_ROOM_URL}/interventions`
+    : '';
+
   const text = `☀️ <b>今日 BD 作戰指令 ${dateStr}</b>
 
 🎯 Top 3 必打：
 
 ${actionLines}
+${agentLines}
 
 📊 作戰系統更新完畢，請進入戰場
 

@@ -206,7 +206,78 @@ model DailyStrategy {
   weekly_focus      String?
   monthly_direction String?
   abandon_list      Json?
+  agent_summary     Json?
   generated_at      DateTime @default(now())
 
   @@map("daily_strategies")
+}
+
+model AgentTaskLog {
+  id           String    @id @default(cuid())
+  agent_name   String    // prospect_developer, follow_up, competitor_monitor, daily_briefing, etc.
+  task_type    String    // outreach_prep, follow_up_prep, scoring, news_fetch, etc.
+  status       String    // running, completed, failed, flagged
+  input        Json?
+  output       Json?
+  duration_ms  Int?
+  error        String?
+  started_at   DateTime  @default(now())
+  completed_at DateTime?
+
+  @@map("agent_task_logs")
+}
+
+model InterventionItem {
+  id           String    @id @default(cuid())
+  agent_name   String
+  type         String    // approval_needed, decision_needed, review_needed, error
+  priority     String    @default("medium") // high, medium, low
+  title        String
+  description  String
+  context      Json?
+  status       String    @default("pending") // pending, approved, rejected, resolved
+  resolved_at  DateTime?
+  expires_at   DateTime?
+  created_at   DateTime  @default(now())
+
+  @@map("intervention_items")
+}
+
+model OutreachRecord {
+  id            String    @id @default(cuid())
+  prospect_id   String?
+  customer_id   String?
+  company_name  String
+  contact_name  String?
+  contact_email String?
+  contact_title String?
+  scenario      String    // cold, post_incident, event_followup, follow_up
+  subject_zh    String?
+  body_zh       String?
+  subject_en    String?
+  body_en       String?
+  status        String    @default("draft") // draft, approved, sent, replied, rejected
+  approved_at   DateTime?
+  sent_at       DateTime?
+  agent_task_id String?
+  notes         String?
+  created_at    DateTime  @default(now())
+  updated_at    DateTime  @updatedAt
+
+  @@map("outreach_records")
+}
+
+model CustomerThread {
+  id           String   @id @default(cuid())
+  customer_id  String?
+  prospect_id  String?
+  company_name String
+  channel      String   // email, line, whatsapp, phone, meeting
+  direction    String   // outbound, inbound
+  content      String
+  sentiment    String?  // positive, neutral, negative
+  ai_summary   String?
+  created_at   DateTime @default(now())
+
+  @@map("customer_threads")
 }

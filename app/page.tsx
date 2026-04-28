@@ -12,7 +12,7 @@ async function getWarRoomData() {
   const today = new Date();
   today.setHours(0, 0, 0, 0);
 
-  const [strategy, attackNow, statuses, incidents, recentNews, stuckPipeline, pipelineTotal] =
+  const [strategy, attackNow, statuses, incidents, recentNews, stuckPipeline, pipelineTotal, pendingInterventions, pendingOutreach] =
     await Promise.all([
       prisma.dailyStrategy.findUnique({ where: { date: today } }),
       prisma.customer.findMany({
@@ -47,6 +47,8 @@ async function getWarRoomData() {
       prisma.pipelineStage.count({
         where: { stage: { notIn: ['close', 'lost'] } },
       }),
+      prisma.interventionItem.count({ where: { status: 'pending' } }),
+      prisma.outreachRecord.count({ where: { status: 'draft' } }),
     ]);
 
   const vendorMap = new Map<string, (typeof statuses)[0]>();
@@ -55,7 +57,7 @@ async function getWarRoomData() {
   }
   const latestStatuses = Array.from(vendorMap.values());
 
-  return { strategy, attackNow, latestStatuses, incidents, recentNews, stuckPipeline, pipelineTotal };
+  return { strategy, attackNow, latestStatuses, incidents, recentNews, stuckPipeline, pipelineTotal, pendingInterventions, pendingOutreach };
 }
 
 const CATEGORY_LABEL: Record<string, { label: string; cls: string }> = {
@@ -66,7 +68,7 @@ const CATEGORY_LABEL: Record<string, { label: string; cls: string }> = {
 };
 
 export default async function WarRoomPage() {
-  const { strategy, attackNow, latestStatuses, incidents, recentNews, stuckPipeline, pipelineTotal } =
+  const { strategy, attackNow, latestStatuses, incidents, recentNews, stuckPipeline, pipelineTotal, pendingInterventions, pendingOutreach } =
     await getWarRoomData();
 
   const top3Actions = (strategy?.top3_actions as Array<{
@@ -109,6 +111,28 @@ export default async function WarRoomPage() {
           <Stat label="競品異常" value={incidents.length} color={incidents.length > 0 ? 'text-orange-400' : 'text-gray-600'} />
         </div>
       </div>
+
+      {/* ── AI Agent Status Bar ── */}
+      {(pendingInterventions > 0 || pendingOutreach > 0) && (
+        <div className="flex items-center gap-3 bg-gray-900 border border-gray-800 rounded-xl px-4 py-3 flex-wrap">
+          <span className="text-xs font-semibold text-gray-500 uppercase tracking-wide">🤖 AI 員工</span>
+          <div className="flex items-center gap-3 flex-wrap flex-1">
+            {pendingInterventions > 0 && (
+              <Link href="/interventions" className="flex items-center gap-1.5 text-sm text-yellow-400 hover:text-yellow-300 font-medium">
+                <span className="w-2 h-2 rounded-full bg-yellow-400 animate-pulse inline-block" />
+                {pendingInterventions} 件待審批
+              </Link>
+            )}
+            {pendingOutreach > 0 && (
+              <Link href="/interventions/outreach" className="flex items-center gap-1.5 text-sm text-blue-400 hover:text-blue-300 font-medium">
+                <span className="w-2 h-2 rounded-full bg-blue-400 animate-pulse inline-block" />
+                {pendingOutreach} 封草稿信待審核
+              </Link>
+            )}
+          </div>
+          <Link href="/agents" className="text-xs text-gray-600 hover:text-gray-400">AI 員工中心 →</Link>
+        </div>
+      )}
 
       {/* ── Incident Alerts ── */}
       {incidents.length > 0 && (

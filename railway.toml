@@ -55,3 +55,14 @@ command = "curl -s -X POST $WAR_ROOM_URL/api/cron/release-prospects -H 'x-cron-s
 name    = "release-partner-prospects"
 schedule = "5 23 * * *"
 command = "curl -s -X POST $WAR_ROOM_URL/api/cron/release-partner-prospects -H 'x-cron-secret: $CRON_SECRET'"
+
+# AI 員工：每天 07:30 (UTC 23:30) 開發新客戶、08:00 (UTC 00:00) 跟進老客戶
+[[crons]]
+name    = "prospect-developer"
+schedule = "30 23 * * *"
+command = "curl -s -X POST $WAR_ROOM_URL/api/cron/prospect-developer -H 'x-cron-secret: $CRON_SECRET'"
+
+[[crons]]
+name    = "follow-up"
+schedule = "0 0 * * *"
+command = "curl -s -X POST $WAR_ROOM_URL/api/cron/follow-up -H 'x-cron-secret: $CRON_SECRET'"

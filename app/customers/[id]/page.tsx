@@ -126,6 +126,39 @@ interface Customer {
   } | null;
 }
 
+type AiModal = 'proposal' | 'pricing' | 'followup' | null;
+
+interface ProposalResult {
+  title: string;
+  summary: string;
+  products: Array<{ name: string; purpose: string; spec: string; monthly_usd: number }>;
+  total_monthly_usd: number;
+  vs_aws_saving_pct: number;
+  architecture_diagram: string;
+  key_advantages: string[];
+  migration_timeline: string;
+}
+
+interface PricingResult {
+  customer_name: string;
+  use_case: string;
+  alibaba: { items: Array<{ item: string; monthly_usd: number }>; total: number };
+  aws: { items: Array<{ item: string; monthly_usd: number }>; total: number };
+  gcp: { items: Array<{ item: string; monthly_usd: number }>; total: number };
+  alibaba_saving_vs_aws_pct: number;
+  annual_saving_usd: number;
+  roi_pitch: string;
+}
+
+interface FollowUpResult {
+  subject_zh: string;
+  body_zh: string;
+  subject_en: string;
+  body_en: string;
+  reason: string;
+  outreach_id?: string;
+}
+
 export default function CustomerDetailPage({ params }: { params: { id: string } }) {
   const { id } = params;
   const [customer, setCustomer] = useState<Customer | null>(null);
@@ -133,6 +166,9 @@ export default function CustomerDetailPage({ params }: { params: { id: string } 
   const [copied, setCopied] = useState(false);
   const [showEdit, setShowEdit] = useState(false);
   const [emailModal, setEmailModal] = useState(false);
+  const [aiModal, setAiModal] = useState<AiModal>(null);
+  const [aiLoading, setAiLoading] = useState(false);
+  const [aiResult, setAiResult] = useState<ProposalResult | PricingResult | FollowUpResult | null>(null);
   const [editForm, setEditForm] = useState<{
     company_name: string; industry: string; region: string; company_size: string;
     website: string; current_cloud: string; priority_label: string; entry_points: string[];
@@ -201,6 +237,22 @@ export default function CustomerDetailPage({ params }: { params: { id: string } 
     setTimeout(() => setCopied(false), 2000);
   };
 
+  const openAiModal = async (type: AiModal) => {
+    if (!type) return;
+    setAiModal(type);
+    setAiResult(null);
+    setAiLoading(true);
+    try {
+      const res = await fetch(`/api/customers/${id}/${type}`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: '{}' });
+      const data = await res.json();
+      setAiResult(data);
+    } catch {
+      setAiResult(null);
+    } finally {
+      setAiLoading(false);
+    }
+  };
+
   if (loading) {
     return (
       <div className="flex items-center justify-center py-20">
@@ -235,6 +287,38 @@ export default function CustomerDetailPage({ params }: { params: { id: string } 
           customerNames={[customer.company_name]}
           onClose={() => setEmailModal(false)}
         />
+      )}
+
+      {/* AI Result Modal */}
+      {aiModal && (
+        <div className="fixed inset-0 bg-black/70 z-50 flex items-center justify-center p-4" onClick={() => setAiModal(null)}>
+          <div
+            className="bg-gray-950 border border-gray-800 rounded-2xl w-full max-w-2xl max-h-[85vh] overflow-y-auto"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="flex items-center justify-between p-5 border-b border-gray-800">
+              <h2 className="text-white font-bold text-lg">
+                {aiModal === 'proposal' ? '☁️ AI 雲方案建議' : aiModal === 'pricing' ? '💰 三雲報價比較' : '🔄 AI 跟進信'}
+              </h2>
+              <button onClick={() => setAiModal(null)} className="text-gray-500 hover:text-white text-xl leading-none">×</button>
+            </div>
+            <div className="p-5">
+              {aiLoading ? (
+                <div className="text-center py-12">
+                  <p className="text-gray-400 animate-pulse">AI 生成中，請稍候...</p>
+                </div>
+              ) : !aiResult ? (
+                <p className="text-red-400 text-center py-8">生成失敗，請重試</p>
+              ) : aiModal === 'proposal' ? (
+                <ProposalView result={aiResult as ProposalResult} />
+              ) : aiModal === 'pricing' ? (
+                <PricingView result={aiResult as PricingResult} />
+              ) : (
+                <FollowUpView result={aiResult as FollowUpResult} />
+              )}
+            </div>
+          </div>
+        </div>
       )}
 
       {/* Edit Modal */}
@@ -390,12 +474,30 @@ export default function CustomerDetailPage({ params }: { params: { id: string } 
             {customer.industry} · {customer.region}
           </p>
         </div>
-        <div className="flex gap-2">
+        <div className="flex gap-2 flex-wrap">
           <button
             onClick={() => setEmailModal(true)}
             className="px-4 py-2 rounded-lg bg-green-700 hover:bg-green-600 text-white text-sm font-medium transition-colors"
           >
             ✉️ 生成開發信
+          </button>
+          <button
+            onClick={() => openAiModal('followup')}
+            className="px-4 py-2 rounded-lg bg-teal-700 hover:bg-teal-600 text-white text-sm font-medium transition-colors"
+          >
+            🔄 生成跟進信
+          </button>
+          <button
+            onClick={() => openAiModal('proposal')}
+            className="px-4 py-2 rounded-lg bg-blue-700 hover:bg-blue-600 text-white text-sm font-medium transition-colors"
+          >
+            ☁️ 生成方案
+          </button>
+          <button
+            onClick={() => openAiModal('pricing')}
+            className="px-4 py-2 rounded-lg bg-yellow-700 hover:bg-yellow-600 text-white text-sm font-medium transition-colors"
+          >
+            💰 報價試算
           </button>
           <Link
             href="/meetings"
@@ -703,6 +805,162 @@ export default function CustomerDetailPage({ params }: { params: { id: string } 
             )}
           </div>
         </div>
+      </div>
+    </div>
+  );
+}
+
+function ProposalView({ result }: { result: ProposalResult }) {
+  return (
+    <div className="space-y-4">
+      {result.summary && (
+        <p className="text-gray-400 text-sm">{result.summary}</p>
+      )}
+      <div className="grid grid-cols-3 gap-3 text-center">
+        <div className="bg-blue-950/30 border border-blue-800/40 rounded-lg p-3">
+          <p className="text-xs text-blue-400 mb-1">月費用</p>
+          <p className="text-xl font-bold text-white">${result.total_monthly_usd?.toLocaleString()}</p>
+        </div>
+        <div className="bg-green-950/30 border border-green-800/40 rounded-lg p-3">
+          <p className="text-xs text-green-400 mb-1">vs AWS 省</p>
+          <p className="text-xl font-bold text-green-400">{result.vs_aws_saving_pct}%</p>
+        </div>
+        <div className="bg-gray-900 border border-gray-700 rounded-lg p-3">
+          <p className="text-xs text-gray-400 mb-1">產品數</p>
+          <p className="text-xl font-bold text-white">{result.products?.length ?? 0}</p>
+        </div>
+      </div>
+
+      <div>
+        <p className="text-gray-400 text-xs font-semibold mb-2">推薦產品</p>
+        <div className="space-y-2">
+          {result.products?.map((p, i) => (
+            <div key={i} className="flex items-start justify-between bg-gray-900 rounded-lg p-3 gap-3">
+              <div>
+                <p className="text-white font-medium text-sm">{p.name}</p>
+                <p className="text-gray-500 text-xs">{p.purpose} · {p.spec}</p>
+              </div>
+              <span className="text-blue-400 text-sm font-bold shrink-0">${p.monthly_usd?.toLocaleString()}/mo</span>
+            </div>
+          ))}
+        </div>
+      </div>
+
+      {result.architecture_diagram && (
+        <div>
+          <p className="text-gray-400 text-xs font-semibold mb-2">架構說明</p>
+          <p className="text-gray-300 text-sm bg-gray-900 rounded-lg p-3 whitespace-pre-line leading-relaxed">{result.architecture_diagram}</p>
+        </div>
+      )}
+
+      {result.migration_timeline && (
+        <div>
+          <p className="text-gray-400 text-xs font-semibold mb-2">遷移時程</p>
+          <p className="text-gray-300 text-sm">{result.migration_timeline}</p>
+        </div>
+      )}
+
+      {result.key_advantages?.length > 0 && (
+        <div>
+          <p className="text-gray-400 text-xs font-semibold mb-2">核心優勢</p>
+          <ul className="space-y-1">
+            {result.key_advantages.map((p, i) => (
+              <li key={i} className="text-green-400 text-sm flex gap-2"><span>✓</span>{p}</li>
+            ))}
+          </ul>
+        </div>
+      )}
+    </div>
+  );
+}
+
+function PricingView({ result }: { result: PricingResult }) {
+  const clouds = [
+    { name: 'Alibaba Cloud', key: 'alibaba' as const, color: 'text-orange-400', bg: 'bg-orange-950/20 border-orange-800/40' },
+    { name: 'AWS', key: 'aws' as const, color: 'text-yellow-400', bg: 'bg-yellow-950/20 border-yellow-800/40' },
+    { name: 'GCP', key: 'gcp' as const, color: 'text-blue-400', bg: 'bg-blue-950/20 border-blue-800/40' },
+  ];
+
+  return (
+    <div className="space-y-4">
+      {result.use_case && <p className="text-gray-400 text-sm">{result.use_case}</p>}
+      <div className="grid grid-cols-3 gap-3">
+        {clouds.map(({ name, key, color, bg }) => {
+          const data = result[key];
+          return (
+            <div key={key} className={`rounded-xl border p-3 ${bg}`}>
+              <p className={`text-xs font-semibold ${color} mb-2`}>{name}</p>
+              <p className="text-white font-bold text-lg">${data?.total?.toLocaleString()}/mo</p>
+              <p className="text-gray-500 text-xs">${((data?.total ?? 0) * 12)?.toLocaleString()}/yr</p>
+              {data?.items?.slice(0, 2).map((item, i) => (
+                <p key={i} className="text-gray-500 text-xs mt-1 leading-relaxed">{item.item}</p>
+              ))}
+            </div>
+          );
+        })}
+      </div>
+
+      <div className="bg-green-950/20 border border-green-800/40 rounded-xl p-4 text-center">
+        <p className="text-green-400 text-sm font-semibold mb-1">選擇阿里雲每年可省 (vs AWS)</p>
+        <p className="text-3xl font-bold text-green-400">${result.annual_saving_usd?.toLocaleString()}</p>
+        <p className="text-green-600 text-sm mt-1">省 {result.alibaba_saving_vs_aws_pct}%</p>
+      </div>
+
+      {result.roi_pitch && (
+        <div className="bg-gray-900 rounded-xl p-4">
+          <p className="text-gray-400 text-xs font-semibold mb-2">ROI 話術</p>
+          <p className="text-white text-sm leading-relaxed">{result.roi_pitch}</p>
+        </div>
+      )}
+    </div>
+  );
+}
+
+function FollowUpView({ result }: { result: FollowUpResult }) {
+  const [lang, setLang] = useState<'zh' | 'en'>('zh');
+  const [copied, setCopied] = useState(false);
+
+  const subject = lang === 'zh' ? result.subject_zh : result.subject_en;
+  const body = lang === 'zh' ? result.body_zh : result.body_en;
+
+  const handleCopy = () => {
+    navigator.clipboard.writeText(`Subject: ${subject}\n\n${body}`);
+    setCopied(true);
+    setTimeout(() => setCopied(false), 2000);
+  };
+
+  return (
+    <div className="space-y-4">
+      {result.reason && (
+        <div className="bg-yellow-950/20 border border-yellow-800/40 rounded-lg p-3">
+          <p className="text-yellow-400 text-xs font-semibold mb-1">AI 跟進理由</p>
+          <p className="text-yellow-200 text-sm">{result.reason}</p>
+        </div>
+      )}
+      <div className="flex items-center gap-1 bg-gray-800 rounded-lg p-1 w-fit">
+        <button onClick={() => setLang('zh')} className={`px-3 py-1 rounded-md text-xs font-medium ${lang === 'zh' ? 'bg-gray-600 text-white' : 'text-gray-400'}`}>中文</button>
+        <button onClick={() => setLang('en')} className={`px-3 py-1 rounded-md text-xs font-medium ${lang === 'en' ? 'bg-gray-600 text-white' : 'text-gray-400'}`}>English</button>
+      </div>
+      <div className="bg-gray-900 rounded-xl p-4 space-y-3">
+        <div>
+          <p className="text-gray-500 text-xs mb-1">Subject</p>
+          <p className="text-white font-medium">{subject}</p>
+        </div>
+        <hr className="border-gray-800" />
+        <div>
+          <p className="text-gray-500 text-xs mb-1">Body</p>
+          <p className="text-gray-300 text-sm whitespace-pre-line leading-relaxed">{body}</p>
+        </div>
+      </div>
+      <div className="flex gap-3">
+        <button onClick={handleCopy} className="px-4 py-2 rounded-lg bg-gray-800 hover:bg-gray-700 text-gray-300 text-sm font-medium">
+          {copied ? '已複製 ✓' : '複製信件'}
+        </button>
+        {result.outreach_id && (
+          <a href="/interventions/outreach" className="px-4 py-2 rounded-lg bg-blue-700 hover:bg-blue-600 text-white text-sm font-medium">
+            在草稿信中查看
+          </a>
+        )}
       </div>
     </div>
   );

@@ -112,23 +112,30 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    const strategy = await prisma.dailyStrategy.upsert({
-      where: { date: today },
-      create: {
-        date: today,
-        top3_actions: result.top3_actions,
-        weekly_focus: result.weekly_focus,
-        abandon_list: result.abandon_list,
-      },
-      update: {
-        top3_actions: result.top3_actions,
-        weekly_focus: result.weekly_focus,
-        abandon_list: result.abandon_list,
-        generated_at: new Date(),
-      },
-    });
+    const [strategy, pendingInterventions, pendingOutreach, runsToday] = await Promise.all([
+      prisma.dailyStrategy.upsert({
+        where: { date: today },
+        create: {
+          date: today,
+          top3_actions: result.top3_actions,
+          weekly_focus: result.weekly_focus,
+          abandon_list: result.abandon_list,
+        },
+        update: {
+          top3_actions: result.top3_actions,
+          weekly_focus: result.weekly_focus,
+          abandon_list: result.abandon_list,
+          generated_at: new Date(),
+        },
+      }),
+      prisma.interventionItem.count({ where: { status: 'pending' } }),
+      prisma.outreachRecord.count({ where: { status: 'draft' } }),
+      prisma.agentTaskLog.count({
+        where: { started_at: { gte: new Date(Date.now() - 24 * 60 * 60 * 1000) } },
+      }),
+    ]);
 
-    await sendDailyBriefing(strategy);
+    await sendDailyBriefing(strategy, { pendingInterventions, pendingOutreach, runsToday });
 
     return NextResponse.json({ success: true, mode: 'daily', strategy });
   } catch (error) {
