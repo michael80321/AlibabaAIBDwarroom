@@ -14,14 +14,22 @@ const AGENT_NAMES = [
 export default async function AgentsPage() {
   const since24h = new Date(Date.now() - 24 * 60 * 60 * 1000);
 
-  const [recentLogs, pendingInterventions, pendingOutreach] = await Promise.all([
-    prisma.agentTaskLog.findMany({
-      orderBy: { started_at: 'desc' },
-      take: 100,
-    }),
-    prisma.interventionItem.count({ where: { status: 'pending' } }),
-    prisma.outreachRecord.count({ where: { status: 'draft' } }),
-  ]);
+  let recentLogs: Awaited<ReturnType<typeof prisma.agentTaskLog.findMany>> = [];
+  let pendingInterventions = 0;
+  let pendingOutreach = 0;
+
+  try {
+    [recentLogs, pendingInterventions, pendingOutreach] = await Promise.all([
+      prisma.agentTaskLog.findMany({
+        orderBy: { started_at: 'desc' },
+        take: 100,
+      }),
+      prisma.interventionItem.count({ where: { status: 'pending' } }),
+      prisma.outreachRecord.count({ where: { status: 'draft' } }),
+    ]);
+  } catch {
+    // Tables not yet migrated — show empty state
+  }
 
   const agents = AGENT_NAMES.map((name) => {
     const logs = recentLogs.filter((l) => l.agent_name === name);

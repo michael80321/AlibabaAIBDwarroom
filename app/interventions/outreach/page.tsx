@@ -4,11 +4,14 @@ import OutreachReviewClient from './OutreachReviewClient';
 export const dynamic = 'force-dynamic';
 
 export default async function OutreachReviewPage() {
-  const drafts = await prisma.outreachRecord.findMany({
-    where: { status: { in: ['draft', 'approved'] } },
-    orderBy: { created_at: 'desc' },
-    take: 50,
-  });
-
-  return <OutreachReviewClient drafts={drafts} />;
+  try {
+    const drafts = await prisma.outreachRecord.findMany({
+      where: { status: { in: ['draft', 'approved'] } },
+      orderBy: { created_at: 'desc' },
+      take: 50,
+    });
+    return <OutreachReviewClient drafts={drafts} />;
+  } catch {
+    return <OutreachReviewClient drafts={[]} />;
+  }
 }

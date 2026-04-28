@@ -12,7 +12,7 @@ async function getWarRoomData() {
   const today = new Date();
   today.setHours(0, 0, 0, 0);
 
-  const [strategy, attackNow, statuses, incidents, recentNews, stuckPipeline, pipelineTotal, pendingInterventions, pendingOutreach] =
+  const [strategy, attackNow, statuses, incidents, recentNews, stuckPipeline, pipelineTotal] =
     await Promise.all([
       prisma.dailyStrategy.findUnique({ where: { date: today } }),
       prisma.customer.findMany({
@@ -47,9 +47,19 @@ async function getWarRoomData() {
       prisma.pipelineStage.count({
         where: { stage: { notIn: ['close', 'lost'] } },
       }),
+    ]);
+
+  // These tables may not exist yet if migration is pending — fail gracefully
+  let pendingInterventions = 0;
+  let pendingOutreach = 0;
+  try {
+    [pendingInterventions, pendingOutreach] = await Promise.all([
       prisma.interventionItem.count({ where: { status: 'pending' } }),
       prisma.outreachRecord.count({ where: { status: 'draft' } }),
     ]);
+  } catch {
+    // Tables not yet migrated — skip
+  }
 
   const vendorMap = new Map<string, (typeof statuses)[0]>();
   for (const s of statuses) {

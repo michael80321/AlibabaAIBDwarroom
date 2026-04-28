@@ -4,17 +4,21 @@ import InterventionsClient from './InterventionsClient';
 export const dynamic = 'force-dynamic';
 
 export default async function InterventionsPage() {
-  const [pending, resolved] = await Promise.all([
-    prisma.interventionItem.findMany({
-      where: { status: 'pending' },
-      orderBy: { created_at: 'desc' },
-    }),
-    prisma.interventionItem.findMany({
-      where: { status: { not: 'pending' } },
-      orderBy: { resolved_at: 'desc' },
-      take: 20,
-    }),
-  ]);
+  try {
+    const [pending, resolved] = await Promise.all([
+      prisma.interventionItem.findMany({
+        where: { status: 'pending' },
+        orderBy: { created_at: 'desc' },
+      }),
+      prisma.interventionItem.findMany({
+        where: { status: { not: 'pending' } },
+        orderBy: { resolved_at: 'desc' },
+        take: 20,
+      }),
+    ]);
 
-  return <InterventionsClient pending={pending} resolved={resolved} />;
+    return <InterventionsClient pending={pending} resolved={resolved} />;
+  } catch {
+    return <InterventionsClient pending={[]} resolved={[]} />;
+  }
 }
