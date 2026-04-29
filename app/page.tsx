@@ -8,66 +8,78 @@ import AlertBanner from '@/components/AlertBanner';
 import Link from 'next/link';
 import GenerateStrategyButton from '@/components/GenerateStrategyButton';
 
+
 async function getWarRoomData() {
   const today = new Date();
   today.setHours(0, 0, 0, 0);
 
-  const [strategy, attackNow, statuses, incidents, recentNews, stuckPipeline, pipelineTotal] =
-    await Promise.all([
-      prisma.dailyStrategy.findUnique({ where: { date: today } }),
-      prisma.customer.findMany({
-        where: { priority_label: { in: ['Attack Now', 'Nurture'] } },
-        orderBy: { priority_score: 'desc' },
-        take: 6,
-      }),
-      prisma.serviceStatus.findMany({
-        distinct: ['vendor'],
-        orderBy: { checked_at: 'desc' },
-      }),
-      prisma.statusIncident.findMany({
-        where: { resolved_at: null },
-        orderBy: { started_at: 'desc' },
-        take: 3,
-      }),
-      prisma.cloudVendorNews.findMany({
-        orderBy: { published_at: 'desc' },
-        take: 4,
-      }),
-      prisma.pipelineStage.findMany({
-        where: {
-          entered_at: { lte: new Date(Date.now() - 14 * 24 * 60 * 60 * 1000) },
-          stage: { notIn: ['close', 'lost', 'hold'] },
-        },
-        include: {
-          customer: { select: { id: true, company_name: true } },
-        },
-        orderBy: { entered_at: 'asc' },
-        take: 5,
-      }),
-      prisma.pipelineStage.count({
-        where: { stage: { notIn: ['close', 'lost'] } },
-      }),
-    ]);
-
-  // These tables may not exist yet if migration is pending — fail gracefully
-  let pendingInterventions = 0;
-  let pendingOutreach = 0;
   try {
-    [pendingInterventions, pendingOutreach] = await Promise.all([
-      prisma.interventionItem.count({ where: { status: 'pending' } }),
-      prisma.outreachRecord.count({ where: { status: 'draft' } }),
-    ]);
+    const [strategy, attackNow, statuses, incidents, recentNews, stuckPipeline, pipelineTotal] =
+      await Promise.all([
+        prisma.dailyStrategy.findUnique({ where: { date: today } }),
+        prisma.customer.findMany({
+          where: { priority_label: { in: ['Attack Now', 'Nurture'] } },
+          orderBy: { priority_score: 'desc' },
+          take: 6,
+        }),
+        prisma.serviceStatus.findMany({
+          distinct: ['vendor'],
+          orderBy: { checked_at: 'desc' },
+        }),
+        prisma.statusIncident.findMany({
+          where: { resolved_at: null },
+          orderBy: { started_at: 'desc' },
+          take: 3,
+        }),
+        prisma.cloudVendorNews.findMany({
+          orderBy: { published_at: 'desc' },
+          take: 4,
+        }),
+        prisma.pipelineStage.findMany({
+          where: {
+            entered_at: { lte: new Date(Date.now() - 14 * 24 * 60 * 60 * 1000) },
+            stage: { notIn: ['close', 'lost', 'hold'] },
+          },
+          include: {
+            customer: { select: { id: true, company_name: true } },
+          },
+          orderBy: { entered_at: 'asc' },
+          take: 5,
+        }),
+        prisma.pipelineStage.count({
+          where: { stage: { notIn: ['close', 'lost'] } },
+        }),
+      ]);
+
+    let pendingInterventions = 0;
+    let pendingOutreach = 0;
+    try {
+      [pendingInterventions, pendingOutreach] = await Promise.all([
+        prisma.interventionItem.count({ where: { status: 'pending' } }),
+        prisma.outreachRecord.count({ where: { status: 'draft' } }),
+      ]);
+    } catch { /* Tables not yet migrated */ }
+
+    const vendorMap = new Map<string, (typeof statuses)[0]>();
+    for (const s of statuses) {
+      if (!vendorMap.has(s.vendor)) vendorMap.set(s.vendor, s);
+    }
+    const latestStatuses = Array.from(vendorMap.values());
+
+    return { strategy, attackNow, latestStatuses, incidents, recentNews, stuckPipeline, pipelineTotal, pendingInterventions, pendingOutreach };
   } catch {
-    // Tables not yet migrated — skip
+    return {
+      strategy: null,
+      attackNow: [],
+      latestStatuses: [],
+      incidents: [],
+      recentNews: [],
+      stuckPipeline: [] as { id: string; customer: { id: string; company_name: string }; entered_at: Date }[],
+      pipelineTotal: 0,
+      pendingInterventions: 0,
+      pendingOutreach: 0,
+    };
   }
-
-  const vendorMap = new Map<string, (typeof statuses)[0]>();
-  for (const s of statuses) {
-    if (!vendorMap.has(s.vendor)) vendorMap.set(s.vendor, s);
-  }
-  const latestStatuses = Array.from(vendorMap.values());
-
-  return { strategy, attackNow, latestStatuses, incidents, recentNews, stuckPipeline, pipelineTotal, pendingInterventions, pendingOutreach };
 }
 
 const CATEGORY_LABEL: Record<string, { label: string; cls: string }> = {
