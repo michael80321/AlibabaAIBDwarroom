@@ -67,7 +67,8 @@ async function getWarRoomData() {
     const latestStatuses = Array.from(vendorMap.values());
 
     return { strategy, attackNow, latestStatuses, incidents, recentNews, stuckPipeline, pipelineTotal, pendingInterventions, pendingOutreach };
-  } catch {
+  } catch (err) {
+    console.error('[WarRoom] getWarRoomData failed:', err);
     return {
       strategy: null,
       attackNow: [],
