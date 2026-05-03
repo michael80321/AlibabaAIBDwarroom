@@ -9,78 +9,63 @@ import Link from 'next/link';
 import GenerateStrategyButton from '@/components/GenerateStrategyButton';
 
 
+async function safeQuery<T>(name: string, fn: () => Promise<T>, fallback: T): Promise<T> {
+  try {
+    return await fn();
+  } catch (err) {
+    console.error(`[WarRoom] ${name} failed:`, err);
+    return fallback;
+  }
+}
+
 async function getWarRoomData() {
   const today = new Date();
   today.setHours(0, 0, 0, 0);
 
-  try {
-    const [strategy, attackNow, statuses, incidents, recentNews, stuckPipeline, pipelineTotal] =
-      await Promise.all([
-        prisma.dailyStrategy.findUnique({ where: { date: today } }),
-        prisma.customer.findMany({
-          where: { priority_label: { in: ['Attack Now', 'Nurture'] } },
-          orderBy: { priority_score: 'desc' },
-          take: 6,
-        }),
-        prisma.serviceStatus.findMany({
-          distinct: ['vendor'],
-          orderBy: { checked_at: 'desc' },
-        }),
-        prisma.statusIncident.findMany({
-          where: { resolved_at: null },
-          orderBy: { started_at: 'desc' },
-          take: 3,
-        }),
-        prisma.cloudVendorNews.findMany({
-          orderBy: { published_at: 'desc' },
-          take: 4,
-        }),
-        prisma.pipelineStage.findMany({
-          where: {
-            entered_at: { lte: new Date(Date.now() - 14 * 24 * 60 * 60 * 1000) },
-            stage: { notIn: ['close', 'lost', 'hold'] },
-          },
-          include: {
-            customer: { select: { id: true, company_name: true } },
-          },
-          orderBy: { entered_at: 'asc' },
-          take: 5,
-        }),
-        prisma.pipelineStage.count({
-          where: { stage: { notIn: ['close', 'lost'] } },
-        }),
-      ]);
+  const [strategy, attackNow, statuses, incidents, recentNews, stuckPipeline, pipelineTotal, pendingInterventions, pendingOutreach] =
+    await Promise.all([
+      safeQuery('strategy', () => prisma.dailyStrategy.findUnique({ where: { date: today } }), null),
+      safeQuery('attackNow', () => prisma.customer.findMany({
+        where: { priority_label: { in: ['Attack Now', 'Nurture'] } },
+        orderBy: { priority_score: 'desc' },
+        take: 6,
+      }), [] as Awaited<ReturnType<typeof prisma.customer.findMany>>),
+      safeQuery('serviceStatus', () => prisma.serviceStatus.findMany({
+        distinct: ['vendor'],
+        orderBy: { checked_at: 'desc' },
+      }), [] as Awaited<ReturnType<typeof prisma.serviceStatus.findMany>>),
+      safeQuery('incidents', () => prisma.statusIncident.findMany({
+        where: { resolved_at: null },
+        orderBy: { started_at: 'desc' },
+        take: 3,
+      }), [] as Awaited<ReturnType<typeof prisma.statusIncident.findMany>>),
+      safeQuery('news', () => prisma.cloudVendorNews.findMany({
+        orderBy: { published_at: 'desc' },
+        take: 4,
+      }), [] as Awaited<ReturnType<typeof prisma.cloudVendorNews.findMany>>),
+      safeQuery('stuckPipeline', () => prisma.pipelineStage.findMany({
+        where: {
+          entered_at: { lte: new Date(Date.now() - 14 * 24 * 60 * 60 * 1000) },
+          stage: { notIn: ['close', 'lost', 'hold'] },
+        },
+        include: { customer: { select: { id: true, company_name: true } } },
+        orderBy: { entered_at: 'asc' },
+        take: 5,
+      }), [] as { id: string; customer: { id: string; company_name: string }; entered_at: Date }[]),
+      safeQuery('pipelineTotal', () => prisma.pipelineStage.count({
+        where: { stage: { notIn: ['close', 'lost'] } },
+      }), 0),
+      safeQuery('interventions', () => prisma.interventionItem.count({ where: { status: 'pending' } }), 0),
+      safeQuery('outreach', () => prisma.outreachRecord.count({ where: { status: 'draft' } }), 0),
+    ]);
 
-    let pendingInterventions = 0;
-    let pendingOutreach = 0;
-    try {
-      [pendingInterventions, pendingOutreach] = await Promise.all([
-        prisma.interventionItem.count({ where: { status: 'pending' } }),
-        prisma.outreachRecord.count({ where: { status: 'draft' } }),
-      ]);
-    } catch { /* Tables not yet migrated */ }
-
-    const vendorMap = new Map<string, (typeof statuses)[0]>();
-    for (const s of statuses) {
-      if (!vendorMap.has(s.vendor)) vendorMap.set(s.vendor, s);
-    }
-    const latestStatuses = Array.from(vendorMap.values());
-
-    return { strategy, attackNow, latestStatuses, incidents, recentNews, stuckPipeline, pipelineTotal, pendingInterventions, pendingOutreach };
-  } catch (err) {
-    console.error('[WarRoom] getWarRoomData failed:', err);
-    return {
-      strategy: null,
-      attackNow: [],
-      latestStatuses: [],
-      incidents: [],
-      recentNews: [],
-      stuckPipeline: [] as { id: string; customer: { id: string; company_name: string }; entered_at: Date }[],
-      pipelineTotal: 0,
-      pendingInterventions: 0,
-      pendingOutreach: 0,
-    };
+  const vendorMap = new Map<string, (typeof statuses)[0]>();
+  for (const s of statuses) {
+    if (!vendorMap.has(s.vendor)) vendorMap.set(s.vendor, s);
   }
+  const latestStatuses = Array.from(vendorMap.values());
+
+  return { strategy, attackNow, latestStatuses, incidents, recentNews, stuckPipeline, pipelineTotal, pendingInterventions, pendingOutreach };
 }
 
 const CATEGORY_LABEL: Record<string, { label: string; cls: string }> = {
