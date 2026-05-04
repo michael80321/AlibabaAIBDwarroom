@@ -3,6 +3,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
 import { fetchAllVendorNews } from '@/lib/news-fetcher';
 import { checkAllVendorStatus } from '@/lib/status-monitor';
+import { scoreAndUpdateCustomer } from '@/lib/scoring';
 
 // Internal trigger — no cron secret needed, but only callable server-side via same origin
 // (not exposed to public internet with secret)
@@ -76,6 +77,19 @@ const ACTIONS: Record<string, () => Promise<unknown>> = {
   'check-status': async () => {
     await checkAllVendorStatus();
     return { message: '雲廠商狀態更新完成' };
+  },
+
+  'score-customers': async () => {
+    const customers = await prisma.customer.findMany({
+      where: { priority_label: { not: 'Dead' } },
+      select: { id: true },
+    });
+    for (const c of customers) {
+      await scoreAndUpdateCustomer(c.id);
+    }
+    const attackNow = await prisma.customer.count({ where: { priority_label: 'Attack Now' } });
+    const nurture = await prisma.customer.count({ where: { priority_label: 'Nurture' } });
+    return { scored: customers.length, attack_now: attackNow, nurture };
   },
 };
 
